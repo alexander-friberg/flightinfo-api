@@ -78,7 +78,7 @@ Other findings from the fixtures:
   | `ACT` | Departed | 94 |
   | `SEQ` | Estimated HH:MM | 41 |
   | `CAN` | Cancelled | 2 |
-- **Open question: should "Deleted" flights be shown at all?** About one in five flights is `DEL`, and the original's card in the video only shows a `Scheduled` flight. It's not clear whether "Deleted" means removed from the schedule or a codeshare duplicate. **Proposed decision:** list them, since they're real records and the original has no known filter, and show their status text as-is. Revisit in task 10 if lists look cluttered.
+- **Should "Deleted" flights be shown at all?** About one in five flights is `DEL`, and the original's card in the video only shows a `Scheduled` flight. It's not clear whether "Deleted" means removed from the schedule or a codeshare duplicate. **Decision (Alex, 2026-11-24): list them as-is**, with their status text shown unchanged. They're real records, and the original has no known filter.
 - **`diIndicator`:** `S` (Schengen) is the most common value (165 of 289 arrivals), then `D`, then `I`.
 - The header's own airport name is `"Stockholm ARN"`, not "Stockholm Arlanda". Use `AIRPORTS` for display names.
 

@@ -215,3 +215,25 @@ for Phases 2–4 of `documentation.md` and for the video.
   - The parser's case handling was inconsistent (`and` matched any case, `eq` didn't). Keywords and the A/D value are now case-insensitive throughout.
 - **Deviations from plan:** none to the code. A note was added to task 10's file: the "by status" preset isn't supported offline.
 - **Live API calls used:** 0
+
+## Task 10 – Flight services: list, search, OData (2026-11-24)
+- **Built:** `services/flights.py`:
+  - `FlightService(source)`, with:
+    - `arrivals` and `departures`, sorted by scheduled time (no time last, ties by flight id)
+    - `search(flight_id, day, airport=None)`, one query
+    - `run_query(filter)` for user-written OData
+  - `odata_presets(airport, day)`: departures, arrivals, one flight, and cancelled flights.
+  
+  `tests/test_flight_services.py` has 53 tests (329 total), using `FakeFlightSource` plus a few against the real `OfflineFlightSource`.
+- **Decisions:**
+  - **"Deleted" flights are listed as-is (Alex's decision).** About one in five flights in the data has status `DEL`; they're real records, and the original had no known filter.
+  - **Search is one query across all airports:** `flightId eq 'SK1415' and scheduled eq '261124'`. Typing `sk 1415` works too. That's one API call instead of two (arrivals and departures), and task 05 showed the API needs no airport.
+  - **Validate, don't escape.** A flight id or airport typed by the user ends up inside a filter string, so a quote could change the query's meaning ("OData injection", like SQL injection). Ids must be letters and digits after normalising, and airports must be three letters. Anything else is refused *before* any API call. The free-text OData option passes filters through unchanged on purpose, because that option *is* the raw query endpoint.
+  - **The "by status" preset is fixed to cancelled flights** (`flightStatus eq 'CAN'`), so it needs no extra prompt. Only the single-flight preset needs a flight id, and a `needs_flight_id` flag lets the menu ask only then.
+  - **Helpful errors:** if Swedavia rejects a typed filter, the message gets a hint listing the supported fields and an example.
+- **Problems & solutions:**
+  - **Two error messages contradicted each other.** Offline, the "Cancelled" preset correctly says "Offline mode only understands flightId, airport, flightType…", but the hint appended after it said `flightStatus` *is* supported. The reviewer caught it. The hint is now worded for a live connection ("With a live connection, Swedavia accepts…"), so both sentences are true, and a test runs that exact case.
+  - **The lists accepted any airport value**, while search validated it, and the HTTP client puts the airport straight into the URL path. All three methods now validate it the same way.
+  - New tests run search and the presets against the **real** offline source. That locks in task 09's claim that its matcher understands exactly the strings this service builds; before, two modules agreed only by convention.
+- **Deviations from plan:** none. The "by status → CAN" choice is recorded in the task file.
+- **Live API calls used:** 0
