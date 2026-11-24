@@ -197,6 +197,8 @@ Response: `200 OK` with an empty JSON object:
 {}
 ```
 
+**⚠ In practice** (recorded 2026-11-24) the body is the JSON string `"IsAlive"`, not `{}`. Judge health by the status code.
+
 ### GET query
 `GET /query[?filter][&continuationtoken][&count]`
 

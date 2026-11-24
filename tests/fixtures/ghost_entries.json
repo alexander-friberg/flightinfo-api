@@ -1,0 +1,40 @@
+{
+  "to": {
+    "arrivalAirportIata": "ARN",
+    "arrivalAirportIcao": "ESSA",
+    "arrivalAirportSwedish": "Stockholm ARN",
+    "arrivalAirportEnglish": "Stockholm ARN",
+    "flightArrivalDate": "2026-11-24"
+  },
+  "numberOfFlights": 8,
+  "flights": [
+    {
+      "flightId": "",
+      "departureAirportEnglish": "",
+      "arrivalTime": {},
+      "locationAndStatus": {"terminal": "T5", "flightLegStatus": "SCH"},
+      "diIndicator": "S"
+    },
+    {
+      "airlineOperator": {"iata": "SK", "icao": "SAS", "name": "SAS Scandinavian Airlines"},
+      "arrivalTime": {"scheduledUtc": ""}
+    },
+    {},
+    {
+      "flightId": "SK1415"
+    },
+    {
+      "departureAirportEnglish": "Copenhagen"
+    },
+    {
+      "arrivalTime": {"scheduledUtc": "2026-11-24T16:25:00Z"}
+    },
+    {
+      "arrivalTime": {},
+      "departureTime": {"scheduledUtc": "2026-11-24T17:40:00Z"}
+    },
+    {
+      "arrivalAirportEnglish": "Oslo"
+    }
+  ]
+}

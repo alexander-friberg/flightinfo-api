@@ -96,3 +96,33 @@ for Phases 2–4 of `documentation.md` and for the video.
 - **Deviations from plan:** `Flight.airport_iata` and the `tzdata` dependency, both explained above.
 - **Live API calls used:** 0
 - **CI:** green after the setup-uv fix, run "feat: configuration and secrets". This closes Task 02's pending check.
+
+## Task 05 – Record fixtures and verify the API reference (2026-11-24)
+- **Built:**
+  - `scripts/record_fixtures.py`, a one-off recorder. The HTTP client, output directory, date, sleep and key are all passed in. `main()` is its tiny composition root.
+  - Real responses saved in `tests/fixtures/` for ARN on 2026-11-24: `arrivals_ARN.json` (289 flights), `departures_ARN.json` (277), `query_sample.json` (search without an airport) and `health.json`.
+  - A hand-made `ghost_entries.json`: 3 ghosts, 5 valid entries, one per rule in the original's `_is_valid_flight()`.
+  - `tests/test_record_fixtures.py` (11 tests, a fake Swedavia built on `httpx.MockTransport`, no network) and `tests/test_contract_live.py`. The live test is excluded by default; run it with `uv run --env-file .env pytest -m live`.
+- **Decisions:**
+  - **The recorder is tested like app code.** It's "only a script", but it handles the API key and spends quota, so the tests prove that the key only goes in the header, there are ≥ 2 s between calls (the query rate limit), and the script refuses to keep a file that contains the key.
+  - **The 6-call budget was planned up front:** 4 fixtures, 1 probe that answers a docs question (is `YYYY-MM-DD` accepted?), and 1 contract-test run. Everything else was answered by analysing the saved files locally.
+  - The search fixture uses a **real** flight id taken from the departures response, so it can't miss.
+- **Problems & solutions:**
+  - **The docs were wrong about the heartbeat:** it returns the JSON string `"IsAlive"`, not `{}`. Task 07 now judges health by the status code and ignores the body. Without the recording, the client would have been built and tested against the wrong body.
+  - **I misread a status code.** I first wrote that `DEL` means "delayed"; the reviewer checked the data, and every `DEL` reads **"Deleted"**, about one flight in five. research.md now has the full code table from the data, and an open question about whether deleted flights should be listed. Lesson: read the data, not the abbreviation.
+  - **A secret-scanner false positive was avoided before it happened.** The query response has a long base64 `continuationtoken`, which gitleaks' generic rule would likely flag and turn CI red. The app never uses it, so the recorder replaces it with a placeholder, and the existing fixture was fixed in place rather than re-recorded, which would have cost quota.
+  - **City names don't match the statistics file one-to-one.** The API appends airport codes (`London LHR`), and some spellings differ (`Addis Abeba` vs `Addis Ababa`). Stripping the code gives 80 of 92 matches. The other 12 (the literal `"Unknown"` plus 11 spellings) are listed in research.md for task 12's alias table.
+  - The reviewer also caught a wrong count in my first write-up (it said "84 of 96" instead of "80 of 92"). Corrected.
+- **What the live API told us** (details in research.md):
+  - `{date}` is a local Swedish day.
+  - A query without `airport` works.
+  - `scheduled` accepts `YYMMDD` and `YYYY-MM-DD`.
+  - `airlineOperator.icao` really is the ICAO code.
+  - Missing fields are omitted rather than empty.
+  - There were no ghost entries in today's data.
+  - Query items have no `scheduledDate`.
+- **Deviations from plan:**
+  - The heartbeat finding changed task 07's health criterion and added a ⚠ note in `api-reference.md`, both outside this task's own files.
+  - `pyproject.toml` now type-checks `scripts/` and puts the repo root on pytest's path, so the tests can import the script.
+  - The `type`/`airline` filter question and whether heartBeat counts against the quota stay unverified: no budget left, and the quota isn't visible in responses.
+- **Live API calls used:** 6 (5 recording, 1 contract test).

@@ -21,7 +21,7 @@ filled in, and the inconsistencies listed below). Task 05 checks that against re
 - Response format is requested with `Accept: application/json`.
 
 ### Quota
-The free tier is rate limited per month. The public FAQ states 10 000 requests/month for FlightInfo, while the dev portal FAQ states 1 000. **Assume the lower number until verified on my own subscription page.** (**Alex:** check the actual limit on the subscription page before task 05.)
+The free tier is rate limited per month. The public FAQ states 10 000 requests/month for FlightInfo, while the dev portal FAQ states 1 000. **Assume the lower number until verified on my own subscription page.** (**Alex:** still unchecked after task 05; 6 calls were safe under either figure.)
 
 Consequences for the design:
 - Tests must **never** call the live API (see Testing strategy in `documentation.md`).
@@ -34,7 +34,7 @@ Consequences for the design:
 | Arrivals for one airport and day | `GET /{iata}/arrivals/{yyyy-mm-dd}` | 200, 204, 304, 400, 500 | 1. View arrivals, 7. Destination overview |
 | Departures for one airport and day | `GET /{iata}/departures/{yyyy-mm-dd}` | 200, 204, 304, 400, 500 | 2. View departures, 7. Destination overview |
 | Free-form OData query | `GET /query?filter=<odata>&count=<n>` | 200, 429 | 3. Search flight, 4. Run OData queries |
-| Health | `GET /heartBeat` (returns `{}`) | 200 | 5. Check API health |
+| Health | `GET /heartBeat` (docs say `{}`; really returns `"IsAlive"`) | 200 | 5. Check API health |
 
 Behaviour worth designing for:
 - **204 No Content** is a normal answer from arrivals/departures (no flights). It means an empty list, not an error.
@@ -49,16 +49,38 @@ OData filter fields: `airport`, `flightType` (`A`/`D`), `scheduled` (local Swedi
 - `airport eq 'ARN' and flightType eq 'D'`
 - `airport eq 'ARN' and scheduled eq '190921' and flightType eq 'D' and flightId eq 'SK007'` (single flight)
 
-### Inconsistencies in the official docs (verify against a real response)
-- The airline example uses `type eq 'D' and airline eq 'SK'`, but neither `type` nor `airline` is a supported filter field (the supported one is `flightType`).
-- `airlineOperator.icao` is described as "the iata code of the party operating the flight". It is presumably the ICAO code.
-- Arrivals say `flights` has "zero or more" items, departures say "one or more". Treat both as possibly empty (and 204 as empty).
-- `scheduled` is described as a "local swedish date" but every example writes it `YYMMDD` (`'190921'`). Check whether `YYYY-MM-DD` is also accepted.
+### Inconsistencies in the official docs (verified 2026-11-24, task 05)
+Checked against real responses recorded in `tests/fixtures/` (ARN, 2026-11-24, 6 live calls):
 
-Also verify in task 05 (not covered by the docs at all):
-- Is `{date}` in arrivals/departures a local Swedish day or a UTC day? (`flightArrivalDate` is described as "in UTC", `scheduled` in queries as a local date.) This decides which flights near midnight show up.
-- Does a query **without** an `airport` clause work (e.g. `flightId eq 'SK532' and scheduled eq '…'`)? Search depends on it.
-- Does `/heartBeat` count against the monthly quota? Each heartbeat run makes several calls.
+| Question | Result |
+|---|---|
+| `type eq 'D' and airline eq 'SK'` in the airline example: are `type`/`airline` really filter fields? | **Not verified** (no call budget left). Use only the documented fields. |
+| Is `airlineOperator.icao` the ICAO code, as the name says, or the IATA code, as the description says? | **ICAO.** It's `SAS` where `iata` is `SK`. Norwegian appears twice: `DY`/`NOZ` and `D8`/`NSZ`. The description is wrong. |
+| Arrivals: "zero or more" flights; departures: "one or more"? | **Not observable** (ARN had 289/277 flights). Still treat both lists as possibly empty, and 204 as empty. |
+| `scheduled`: `YYMMDD` only, or `YYYY-MM-DD` too? | **Both work.** `scheduled eq '261124'` and `scheduled eq '2026-11-24'` each found the same flight. |
+| Is `{date}` in arrivals/departures a local Swedish day or a UTC day? | **Local.** ARN arrivals for 2026-11-24 ran from `2026-11-23T23:00Z` to `2026-11-24T22:55Z`, which is 00:00–23:55 Swedish time (CET). |
+| Does a query **without** `airport` work? | **Yes.** `flightId eq 'AY808' and scheduled eq '261124'` returned the ARN→HEL departure. Search needs no airport. |
+| Does `/heartBeat` count against the monthly quota? | **Not observable** from the response. Assume yes and keep the heartbeat short. |
+| What does `/heartBeat` return? | **The docs are wrong:** the body is the JSON string `"IsAlive"`, not `{}`. Health checks should rely on the status code, not the body. |
+| Query items: `arrival` or `departure` plus `scheduledDate`? | Each item has **only** `arrival` or `departure`; `scheduledDate` was absent. Don't rely on it. |
+| `numberOfFlights` | Equals `len(flights)` in both lists. |
+
+Other findings from the fixtures:
+- **Missing fields are omitted, not empty.** A flight without a gate has no `gate` key at all (it isn't `""`). The parser must use `.get()` everywhere.
+- **No ghost entries** in today's ARN data. `tests/fixtures/ghost_entries.json` is hand-made from the rules in `_is_valid_flight()` so task 06 can still test them.
+- **Status codes seen**, as `flightLegStatus` → `flightLegStatusEnglish` across 566 flights. The English text is always present, and some of it includes a time:
+
+  | Code | English text | Count |
+  |---|---|---|
+  | `SCH` | Scheduled | 218 |
+  | `DEL` | **Deleted** (not "delayed") | 117 |
+  | `LAN` | Landed HH:MM | 94 |
+  | `ACT` | Departed | 94 |
+  | `SEQ` | Estimated HH:MM | 41 |
+  | `CAN` | Cancelled | 2 |
+- **Open question: should "Deleted" flights be shown at all?** About one in five flights is `DEL`, and the original's card in the video only shows a `Scheduled` flight. It's not clear whether "Deleted" means removed from the schedule or a codeshare duplicate. **Proposed decision:** list them, since they're real records and the original has no known filter, and show their status text as-is. Revisit in task 10 if lists look cluttered.
+- **`diIndicator`:** `S` (Schengen) is the most common value (165 of 289 arrivals), then `D`, then `I`.
+- The header's own airport name is `"Stockholm ARN"`, not "Stockholm Arlanda". Use `AIRPORTS` for display names.
 
 ### Airports
 In the order and with the names the original lists them (see "What we know (from the video)").
@@ -182,8 +204,36 @@ From `api-reference.md`. The left column is the original's display; `X` is `arri
 | Scheduled / Estimated / Actual | `arrivalTime.{scheduled,estimated,actual}Utc` | `departureTime.…Utc` | **UTC**; convert to `Europe/Stockholm` for display |
 | D/I | `diIndicator` | `diIndicator` | `D`, `I` or `S` |
 
-Which of these fields are actually filled in for a real flight, and how city names are spelled,
-is checked against the recorded fixtures in task 05.
+**Confirmed against the fixtures (task 05).** How often each display field was present in
+today's ARN data:
+
+| Field | Arrivals (289) | Departures (277) |
+|---|---|---|
+| flight id, airline name + IATA, other airport name + IATA, status, terminal, scheduled, D/I | always | always |
+| gate | 129 | 151 |
+| baggage belt | 226 | – |
+| estimated | 130 | 12 |
+| actual | 94 | 94 |
+
+**City spelling vs `city_country.json` (matters for task 12).**
+- The API writes cities in English, but cities with several airports get the airport code appended: `London LHR`, `Paris CDG`, `Istanbul SAW`, `New York EWR`. Strip a trailing three-letter upper-case code before looking a city up.
+- The fixtures name 96 distinct cities. Stripping the code leaves 92 (`London LGW/LHR/STN`, `Istanbul IST/SAW` and `Paris CDG/ORY` each merge into one city). **80 of those 92** match a city in the 2025 Excel file, accent- and case-insensitively.
+- The other 12 are the literal `"Unknown"` plus 11 spelling differences that need a small alias table:
+
+  | API | Excel |
+  |---|---|
+  | Addis Abeba | Addis Ababa |
+  | Geneva | Geneve |
+  | Vaasa | Vasa |
+  | Sal | Sal Island |
+  | Sundsvall | Sundsvall Härnösand |
+  | Hemavan Tärnaby | Hemavan |
+  | Åre Östersund | Östersund |
+  | Bergamo | Milan |
+  | Malta | (country only) |
+  | Munich, Charleroi | (no obvious match) |
+
+  `"Unknown"` should map straight to the "Unknown" country fallback, not count as an unmatched city.
 
 ---
 
@@ -282,7 +332,7 @@ Hypotheses, from most to least likely:
 2. **Repeated ping**: send N requests with an interval (e.g. 5 × every 2 s) and show min/avg/max latency, like `ping`.
 3. **Background thread** that polls while the menu runs and shows status in the menu header.
 
-The API reference shows a dedicated `GET /heartBeat` endpoint that returns `200` with `{}`, so each ping is one call to it, timed by the client.
+The API has a dedicated `GET /heartBeat` endpoint, so each ping is one call to it, timed by the client. The reference says it returns `{}`, but the real body is the JSON string `"IsAlive"` (task 05), so a ping is judged by its status code, not its body.
 
 **Decision:** implement option 2 with a small N and a configurable interval. It looks like a "heartbeat", stays quota-friendly and is fully testable with an injected clock and a fake source. A background thread (option 3) is not planned.
 

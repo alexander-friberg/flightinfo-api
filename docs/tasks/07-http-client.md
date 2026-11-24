@@ -18,7 +18,7 @@ offline mode and tests can all swap implementations.
 - [ ] `api/client.py`: `SwedaviaClient(settings, http: httpx.Client)`. The httpx client is injected; the class never creates its own
 - [ ] Sends `Ocp-Apim-Subscription-Key` and `Accept: application/json` on every request; dates formatted `YYYY-MM-DD`; OData filter URL-encoded; `query` always sends an explicit `count` (a module constant, 1000) and no `continuationtoken`
 - [ ] `204 No Content` from arrivals/departures returns an empty list, not an error
-- [ ] `health()` calls `GET /heartBeat` (response body `{}`) and measures latency using an injected clock (`Callable[[], float]`, default `time.perf_counter`)
+- [ ] `health()` calls `GET /heartBeat`, judges health by the HTTP status only (the docs say the body is `{}`, but it is really `"IsAlive"`; see `tests/fixtures/health.json`) and measures latency using an injected clock (`Callable[[], float]`, default `time.perf_counter`)
 - [ ] Error messages never contain the key or the request headers
 - [ ] Tests use `httpx.MockTransport` only: correct URL per method (including `count` on query), headers present, 204 → empty list, each status → right error, timeout → `ApiUnavailableError`, successful responses parsed via the fixtures, and the key absent from every error message
 - [ ] `tests/fakes.py` gains `FakeFlightSource` (canned data plus a call counter) for later tasks

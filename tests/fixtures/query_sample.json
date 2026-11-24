@@ -1,0 +1,41 @@
+{
+  "flights": [
+    {
+      "departure": {
+        "flightId": "AY808",
+        "arrivalAirportSwedish": "Helsingfors",
+        "arrivalAirportEnglish": "Helsinki",
+        "airlineOperator": {
+          "iata": "AY",
+          "icao": "FIN",
+          "name": "Finnair"
+        },
+        "departureTime": {
+          "scheduledUtc": "2026-11-24T09:20:00Z"
+        },
+        "locationAndStatus": {
+          "terminal": "T2",
+          "flightLegStatus": "DEL",
+          "flightLegStatusSwedish": "Borttagen",
+          "flightLegStatusEnglish": "Deleted"
+        },
+        "checkIn": {},
+        "codeShareData": [],
+        "flightLegIdentifier": {
+          "callsign": "FIN6EH",
+          "flightId": "AY808",
+          "flightDepartureDateUtc": "2026-11-24T00:00:00Z",
+          "departureAirportIata": "ARN",
+          "arrivalAirportIata": "HEL",
+          "departureAirportIcao": "ESSA",
+          "arrivalAirportIcao": "EFHK"
+        },
+        "viaDestinations": [],
+        "remarksEnglish": [],
+        "remarksSwedish": [],
+        "diIndicator": "S"
+      }
+    }
+  ],
+  "continuationtoken": "<continuation token removed from fixture>"
+}
