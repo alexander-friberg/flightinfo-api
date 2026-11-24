@@ -154,7 +154,7 @@ Swedavia's "Trafikflöde / Traffic by flight stage" statistics for **2025**, wit
 | `avr utr pax per kvartal` | the same in long format | quarter, country, city, passengers |
 
 Findings (counted with a quick stdlib script, before any build script exists):
-- **It does not give 263 cities / 59 countries.** `land-fpl` has about 344 unique cities in 67 countries, including Sweden. The international-only sheet has about 305 cities in 67 countries. The original was most likely built from an earlier year's file, so **263/59 can't be used as a test for our JSON**.
+- **It does not give 263 cities / 59 countries.** `land-fpl` has 345 cities in 67 countries, including Sweden (the build script's count, task 12). The international-only sheet has about 305 cities in 67 countries. The original was most likely built from an earlier year's file, so **263/59 can't be used as a test for our JSON**.
 - Subtotal rows mix in with the data: `<COUNTRY> Summa` and `<City> Summa`. The build script must skip them.
 - Placeholder values: `(tom)` (empty) as a city and as a country, and `UNKNOWN` as a country. Skip them.
 - Countries are in English capitals (`AUSTRIA`, `GREAT BRITAIN`). Cities are mixed case (`Vienna`, `ALICANTE`, `ANNECY/MEYTHET`), and some are Swedish spellings (`Bagdad`, `Alger`), so they may not match the API's English `…AirportEnglish` names. Normalisation handles the case; the spelling has to be compared with real fixtures (task 05) and handled with a small alias table if needed.
@@ -230,8 +230,13 @@ today's ARN data:
   | Hemavan Tärnaby | Hemavan |
   | Åre Östersund | Östersund |
   | Bergamo | Milan |
-  | Malta | (country only) |
-  | Munich, Charleroi | (no obvious match) |
+  | Malta | Valetta (the file's spelling) |
+  | Munich | München |
+  | Charleroi | Brussels (like Bergamo → Milan: a secondary airport filed under its city) |
+
+  *(Task 12: Munich and Malta were first listed here as "no match". A search for "munch" missed
+  `München` because of the ü. With these aliases, every city in the fixtures resolves except
+  the literal "Unknown".)*
 
   `"Unknown"` should map straight to the "Unknown" country fallback, not count as an unmatched city.
 

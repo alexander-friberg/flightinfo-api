@@ -28,3 +28,4 @@ Wiring real dependencies and `--offline` (task 14).
 
 ## Notes
 - From task 11: a ping that failed without a response has `status_code=None` and `latency_ms=0.0`. Print latency only for pings that got a response, so the screen never shows "0.0 ms" for a failure.
+- From task 12: the overview is a free function, `destination_overview(source, lookup, airport, day, which, match=None)`, not a service object. Wire it with `functools.partial` (or pass `source` and `lookup` into `run_destination_overview`) rather than redesigning it. `Which("1"|"2"|"3")` maps the 1–3 answer directly.

@@ -10,7 +10,14 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest", "pytest-cov", "ruff", "mypy"]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+    "openpyxl>=3.1.5",
+    "types-openpyxl>=3.1.5.20261122",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.9,<0.14"]

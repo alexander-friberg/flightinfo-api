@@ -36,14 +36,14 @@ _EXTRA_ALIASES = {
 }
 
 
-def _fold(text: str) -> str:
+def fold(text: str) -> str:
     """Lower-case, collapse whitespace and strip accents, so `Göteborg` matches `goteborg`."""
     decomposed = unicodedata.normalize("NFKD", " ".join(text.split()).casefold())
     return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
 
 _ALIASES = {
-    _fold(name): code
+    fold(name): code
     for name, code in [*((n, c) for c, n in AIRPORTS.items()), *_EXTRA_ALIASES.items()]
 }
 
@@ -53,7 +53,7 @@ def resolve_airport(raw: str) -> str | None:
     code = raw.strip().upper()
     if code in AIRPORTS:
         return code
-    return _ALIASES.get(_fold(raw))
+    return _ALIASES.get(fold(raw))
 
 
 def to_local(dt: datetime) -> datetime:

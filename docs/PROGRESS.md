@@ -253,3 +253,23 @@ for Phases 2–4 of `documentation.md` and for the video.
   - `documentation.md` said the heartbeat tests use a `FakeClock`. They use a recording fake sleep instead (the latency is measured inside the client, task 07). One line corrected.
 - **Deviations from plan:** `tests/fakes.py` gained the scripted health mode. Small doc fixes in `documentation.md` and task 13's notes.
 - **Live API calls used:** 0
+
+## Task 12 – Destination statistics (2026-11-24)
+- **Built:**
+  - `scripts/build_city_country.py` reads Swedavia's 2025 statistics (`land-fpl` sheet) and writes `src/flightboard/data/city_country.json`: **345 cities in 67 countries**.
+  - `data/lookup.py`: `CityCountryLookup` matches the API's city names to that file, and `load_lookup()` reads the shipped JSON through an injectable reader.
+  - `services/destinations.py`: `destination_overview(...)` counts flights per city for arrivals, departures or both, with one filter, and lists unmatched cities separately.
+  - 48 new tests (415 total).
+- **Decisions:**
+  - **A build script, not a hand-edited file.** The JSON is generated from the official Excel file, and rerunning the script gives a byte-identical file (sorted keys). That makes the data reproducible: next year's statistics are one command away. The script skips subtotal rows (`… Summa`) and placeholders (`(tom)`, `UNKNOWN`), and refuses a city listed under two countries.
+  - **Data and fixes kept apart:** the JSON holds only what's in the Excel file. The handful of spelling differences between the API and the statistics (`Addis Abeba` vs `Addis Ababa`, `Munich` vs `München`, …) are a small alias table in code, where they're visible and reviewable.
+  - **Tolerant matching:** case, extra spaces and å/ä/ö are ignored (the same `fold()` as the airport names), and a trailing airport code is stripped, so `London LHR`, `London LGW` and `London STN` count as one "London".
+  - **One filter, like the original:** `destinationer.py` had a single `Filter?` prompt, so one text matches either the city or the country.
+  - The service reuses `FlightService` to fetch, so airport validation and sorting are identical to the menu's, and only the requested direction is fetched (each fetch costs quota).
+  - New dev dependency `openpyxl` (with its type stubs) to read Excel, approved by Alex. It's only used by the build script, never by the app.
+- **Problems & solutions:**
+  - **"Not found" really was in the data.** In task 05 I listed Munich, Malta and Charleroi as having "no obvious match" in the statistics. The reviewer found `München`, `Valetta` (Malta's capital, in the file's spelling) and `Brussels` (Charleroi is Brussels-South Charleroi airport) right there. My search for "munch" missed `München` because of the ü. With three more aliases, every city in the recorded data now resolves except the API's own "Unknown", and a test locks that in. Lesson: when searching data with accents, fold the search too, as the app does.
+  - **One city, two rows:** counting used the raw spelling while the lookup and filter ignored case, so "Oslo" and "OSLO" would have been two rows. Counting now groups by the folded name and shows the first spelling.
+  - The original's "263 cities / 59 countries" doesn't apply: this year's file has 345/67. The data test checks the counts the build script reported, plus known cities (Tirana → ALBANIA) and that no two spellings disagree on a country.
+- **Deviations from plan:** `fold()` in `domain/airports.py` became public for reuse. research.md's alias table and city count were corrected, and a note was added to task 13 about the function signature.
+- **Live API calls used:** 0
