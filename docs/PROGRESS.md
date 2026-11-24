@@ -126,3 +126,23 @@ for Phases 2–4 of `documentation.md` and for the video.
   - `pyproject.toml` now type-checks `scripts/` and puts the repo root on pytest's path, so the tests can import the script.
   - The `type`/`airline` filter question and whether heartBeat counts against the quota stay unverified: no budget left, and the quota isn't visible in responses.
 - **Live API calls used:** 6 (5 recording, 1 contract test).
+
+## Task 06 – Parser and ghost-entry validation (2026-11-24)
+- **Built:** `api/parsing.py`, the edge where raw JSON becomes `Flight` objects:
+  - `is_valid_flight()`, the original's ghost rule, unchanged
+  - `parse_flights(payload, direction)` for arrivals and departures
+  - `parse_query(payload)` for query results, where each item wraps an `arrival` or a `departure`
+  
+  `tests/test_parsing.py` has 40 tests (176 in total): the real ARN fixtures (289 arrivals, 277 departures), one real flight (FR4679) checked field by field, the ghost fixture, and hand-made broken inputs.
+- **Decisions:**
+  - **Every lookup is defensive.** A missing key, an empty or whitespace-only string, or a value of the wrong type all become `None`. Task 05 showed the API leaves missing fields out entirely, so nothing can assume a key exists. Bad input never raises.
+  - **Unparsable timestamps become "missing"**, not errors, so one broken time can't stop a whole list from loading. Times without an offset are read as UTC, because every field is named `…Utc`. Times with an offset are converted to UTC.
+  - **One table instead of if/else:** arrivals and departures mirror each other (`arrivalTime` vs `departureTime`, origin vs destination), so a small `_Keys` table per direction drives one shared function.
+  - **The original's ghost rule is kept exactly, quirk included.** `arrivalTime or departureTime` picks a non-empty `arrivalTime` even when only `departureTime` has the scheduled time. The task asks for the original's semantics, real data never mixes the two keys, and a test pins the quirk so nobody "fixes" it by accident.
+  - The flight's own airport comes from `flightLegIdentifier`, falling back to the response header. Query results have no header.
+  - `Flight` from task 04 needed no changes; its field names matched the real data.
+- **Problems & solutions:**
+  - **CI's secret scan failed on the previous push (task 05).** gitleaks flagged the *made-up* test key in `tests/test_record_fixtures.py` as a possible real API key. Rewriting the line wouldn't help, because the scan covers the whole history and the old commit keeps the line. Solved with gitleaks' own mechanism: a `.gitleaksignore` listing that one finding's fingerprint (commit + file + rule + line), so every other secret is still caught. An inline `# gitleaks:allow` on the line keeps future edits quiet. Committed separately as a CI fix. Lesson: a fake secret that looks realistic will be treated as real, which is good behaviour from the scanner; give test keys low entropy, or mark them.
+  - The reviewer pointed out that one test computed its expected value with the function under test (`len(raw) - ghosts` using `is_valid_flight`), so a bug would have cancelled itself out. It now asserts the known counts, 289 and 277.
+- **Deviations from plan:** none.
+- **Live API calls used:** 0
