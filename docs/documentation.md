@@ -256,27 +256,114 @@ Not now, possible later:
 
 ---
 
-## Phase 2: Implementation *(fill in)*
+## Phase 2: Implementation
 
 ### How the work started
-*(Repository setup, first commit, first green CI run.)*
+I created the repository with the research, the task queue and the Claude Code setup (`CLAUDE.md`, `.claude/`) as the first commit, so the rules and the plan existed before any code. From then on every change went through the same loop: the agent took the next task from `docs/tasks/`, wrote tests first, implemented, had the reviewer subagent check it, logged it in `PROGRESS.md` and staged it. I read the staged diff and the agent's explanation, and committed it myself. The project ended up as 20 commits, one per task plus a few separate fixes. 
+
+The first two tasks were pure setup:
+- **Task 01, the skeleton:** a `uv` project with a `src/` layout, an empty package for each layer, and ruff, mypy (strict) and pytest configured. From this point the Stop hook ran the full check on every turn, so nothing unfinished could be handed over.
+- **Task 02, CI:** a GitHub Actions workflow with two jobs. One runs the same checks on Python 3.12 and 3.13; the other scans the whole git history for secrets with gitleaks. **The first CI run failed.** The `setup-uv` action has no `v10` tag, only full versions. I had misread its README, which pins a commit with a `# v10.4.0` comment. Pinning that exact commit made CI green. The secret scan passed on that first run, so the repository started clean.
 
 ### Project structure
-*(Final structure. Note any differences from the plan and why.)*
+The final structure follows the plan in Phase 1, with these differences:
+
+| Difference | Why |
+|---|---|
+| `cli/app.py` holds `App`, the bundle of everything the menu needs | The menu calls the demo and the demo needs `App`; keeping `App` in `menu.py` would have been a circular import |
+| `cli/pager.py` is its own module | Paging (50 flights per page, Enter / `a` / `q`) is used by both the flight lists and the destination table |
+| `cli/destinations.py` is an offer after menu options 1 and 2, not its own menu option | The original's menu has six options; see "Problems and solutions" below |
+| `data/samples/` holds a copy of the recorded responses | Offline mode must work after installing the package, without the `tests/` folder |
+| Many small test files (one per module) instead of a few large ones | Each test file matches one module, so a failing test points straight at the code |
+| No `FakeClock` class; tests pass small functions instead (`lambda: 0.0`, `sleeps.append`) | Injecting a plain function was enough everywhere, so a class would have been extra code |
+| `.gitleaksignore` | One known false positive in the history (see below) |
 
 ### What was built first
-*(Expected: domain model and parser against fixtures. Explain why starting at the core and working outwards made testing easier.)*
+I built from the inside out:
+1. **The domain (task 04):** the `Flight` model and the airport list. It has no I/O at all, so it's tested with plain values.
+2. **Real data (task 05):** one small script recorded real responses from the API as test fixtures. This used 6 live calls, planned in advance.
+3. **The parser (task 06):** turns that real JSON into `Flight` objects.
+4. Only then the HTTP client (07), and after that everything that uses it.
+
+This order made testing easy. Every layer was tested against the layer below it, which already existed and worked. The parser was tested on *real* recorded data, not on what I guessed the API would return. By the time the HTTP client existed, the hard part (turning messy JSON into clean objects) was already proven, so the client tests only had to check URLs, headers and error codes. They do that against a fake Swedavia (`httpx.MockTransport`), so the 521 tests run in about a second and never touch the network.
 
 ### How the features were developed
-*(One short subsection per feature: arrivals/departures, search, OData, health/heartbeat, destinations, demo.)*
+All features depend on one small interface, `FlightSource` (arrivals, departures, query, health). The real client, the cache, the offline source and the test fake are four implementations of it. That's why offline mode and the tests needed no special code paths in the features themselves.
+
+#### Arrivals and departures (options 1 and 2)
+The service asks the source for one airport and day, then sorts by scheduled time. The menu shows the flights as cards with the original's layout and spacing, copied from the video, 50 per page. Times are shown as `16:25 UTC → 17:25 CET`, converted with `zoneinfo`, including summer time (CEST). I made one deliberate change to the original's card: both airports are shown as `Name (IATA)`, so the queried airport's name is filled in where the original left it blank. Flights with status "Deleted" (about one in five) are listed as they come, which was my decision since they're real records.
+
+#### Search (option 3)
+One OData query finds a flight number on a date at *every* Swedavia airport: `flightId eq 'SK1415' and scheduled eq '261124'`. That's one API call instead of two, and recording real data (task 05) proved the API accepts a query without an airport. The flight number is normalised (`sk 1415` finds `SK1415`) and must be letters and digits only, so a typed quote can't change the query (the same idea as SQL injection).
+
+#### OData query (option 4)
+The user picks an airport and a date, then one of four ready-made queries:
+- departures
+- arrivals
+- one flight
+- cancelled flights
+
+The fifth choice is to type their own filter. If Swedavia rejects a typed filter, the message adds a short hint with the supported fields and an example.
+
+#### HeartBeat (option 5)
+The original only mentions a "heartbeat" health check, so I recreated it like the `ping` command: five calls to `/heartBeat`, 2 s apart, each printed as it happens, then a summary (successes, failures, min/avg/max latency). The waiting is an injected `sleep` function, so the tests check the exact rhythm without waiting.
+
+The API documentation says `/heartBeat` returns `{}`, but the real response is `"IsAlive"`. So health is judged by the HTTP status code only.
+
+#### Destination overview (the original's `destinationer.py`)
+After options 1 and 2 list their flights, the app asks whether to show a destination overview. The overview lists every city with its country and number of flights, sorted by count. It has an optional filter on country or city, and lists the cities missing from the statistics file. It's counted from the flights already listed, so it costs no extra API call.
+- **Where the countries come from:** a build script turns Swedavia's official 2025 statistics (Excel) into `city_country.json`, with 345 cities in 67 countries. Rerunning it gives an identical file, so next year's statistics are one command away.
+- **Matching names:** city names from the API are matched ignoring case and å/ä/ö. Airport codes are stripped (`London LHR` → `London`), and a small alias table covers known spelling differences (`Munich` → `München`).
+
+#### Full-auto demo (option 6)
+The demo runs five headed steps with no input against Arlanda today:
+1. arrivals
+2. departures
+3. a search for the first real departure
+4. an OData query
+5. three heartbeat pings
+
+It uses exactly the same services as the menu. It pauses 2.5 s between steps because the query endpoint only allows one call per 2 s, and steps 3 and 4 are both queries. A failing step prints its error and the demo continues.
+
+#### Offline mode (`--offline`)
+`uv run python -m flightboard --offline` runs the whole app on the recorded Arlanda day, with no key and no network. The header says it's sample data. Offline mode is just another `FlightSource`; the only place that knows about it is `__main__.py`, which builds either the real stack or the offline one. It's useful for the video and when the monthly quota runs out.
+
+#### Configuration and secrets
+The API key is read from an environment variable that `uv run --env-file .env` loads from a git-ignored `.env`:
+- If the key is missing, the app prints one line explaining what to do and exits with code 2, before any network object exists.
+- The key is masked as `***` whenever the settings are printed.
+- The key is sent only in a request header, never in the URL.
+- Error messages are scrubbed of it.
+- HTTP redirects are never followed.
 
 ### Problems and solutions
-- **Problem:** *(e.g. API response differed from the documentation)*
+- **Problem:** The API documentation didn't match the real API. The heartbeat returns `"IsAlive"` instead of `{}`, and `DEL` turned out to mean "Deleted", not "delayed" as I first assumed.
+  **Solution:** Before writing the client, I recorded real responses (6 live calls, planned in advance) and compared them with the documentation. Every difference is listed in `research.md`, and the code follows the real behaviour. The client was then built and tested against real data, not the documentation.
+- **Problem:** The API leaves out missing fields instead of sending them empty, and the original's code shows it can send "ghost" entries with no flight number, airport or time.
+  **Solution:** One parser at the edge of the program turns raw JSON into `Flight` objects:
+  - Every missing, empty or wrongly typed value becomes "missing", and a broken timestamp counts as missing rather than crashing.
+  - Ghost entries are removed with the original's own rule.
+  
+  Nothing past the parser ever sees raw JSON.
+- **Problem:** Time zones. The API gives UTC, users want Swedish time, and summer time makes this easy to get wrong.
+  **Solution:** All times are stored as UTC and converted to `Europe/Stockholm` only when shown. Times without a time zone are refused, because Python would silently treat them as the computer's own local time. Tests cover both daylight-saving switches. One of those tests failed even though the conversion was right: for the repeated hour in October, Python deliberately treats the same moment in two time zones as *unequal* (PEP 495). The test now compares the actual instants.
+- **Problem:** CI failed twice for reasons unrelated to my code.
+  - The `setup-uv@v10` tag doesn't exist (see "How the work started").
+  - gitleaks flagged a *made-up* API key in a test as a real secret. Because the scan covers the whole history, changing the test didn't help.
+  
   **Solution:**
-- **Problem:** *(e.g. ghost entries / missing fields)*
-  **Solution:**
-- **Problem:** *(e.g. time zones)*
-  **Solution:**
+  - Pin the exact commit of `setup-uv`.
+  - For gitleaks, ignore that one finding by its exact fingerprint (commit + file + rule + line) in `.gitleaksignore`, so every other secret is still caught. Test keys are now obviously fake (`"fake-key"`).
+- **Problem:** The full-history secret scan I had planned didn't scan the full history. gitleaks-action only scans the newly pushed commits, whatever `fetch-depth` is set to.
+  **Solution:** The reviewer questioned it, and reading the action's source code confirmed it. CI now runs the gitleaks program itself, pinned and checksum-verified, with `--log-opts="--all"`.
+- **Problem:** A security hole the tests didn't cover. When `httpx` follows a redirect to another host, it keeps custom headers, and the Swedavia key is sent in a custom header.
+  **Solution:** Redirects are never followed. A test builds a client *with* redirects switched on and checks that the key only ever reaches Swedavia.
+- **Problem:** City names from the API don't match the statistics file one-to-one: `London LHR`, `Addis Abeba` vs `Addis Ababa`, `Munich` vs `München`. My own first search missed `München` because of the ü.
+  **Solution:** City names are matched with case and accents ignored, airport codes are stripped, and there's an alias table for the spelling differences. A test checks that every city in the recorded data resolves, except the API's own "Unknown".
+- **Problem:** A misunderstanding about the original's menu. I had added a seventh option, "Destination overview", but the original has exactly six.
+  **Solution:** The overview became part of options 1 and 2, built from the flights already fetched, and option 7 was removed. The decision and how the misunderstanding happened are recorded in `research.md` and `PROGRESS.md`. 
+- **Problem:** Some tests couldn't fail. One checked "something came back" instead of the right value. Another computed its expected result with the function it was testing, and one "immutability" test would still pass if the object stopped being immutable.
+  **Solution:** For each guarantee the reviewer questioned, the fix was checked by removing the code it protects and confirming the test then fails. The client closing on exit, the redirect block and the cache's copies were all checked this way.
 
 ---
 
