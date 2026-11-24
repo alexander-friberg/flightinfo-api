@@ -66,13 +66,19 @@ class FakeFlightSource:
 
 
 class ScriptedConsole:
-    """Builds a `Console` whose input is a fixed script and whose output is recorded."""
+    """Builds a `Console` whose input is a fixed script and whose output is recorded.
+
+    `lines` holds what a user would see: a multi-line write (a flight card) becomes several lines.
+    """
 
     def __init__(self, answers: Iterable[str] = ()) -> None:
         self._answers = list(answers)
         self.prompts: list[str] = []
         self.lines: list[str] = []
-        self.console = Console(read=self._read, write=self.lines.append)
+        self.console = Console(read=self._read, write=self._write)
+
+    def _write(self, text: str) -> None:
+        self.lines.extend(text.split("\n"))
 
     @property
     def output(self) -> str:

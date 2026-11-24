@@ -24,3 +24,6 @@ flag. After this task the app is feature-complete.
 README and docs (task 15).
 
 ## Notes
+- From 13b: build `App(console, source, lookup, today, sleep, title)` and call `run_menu(app)`. Replace option 6's placeholder (`_demo` in `cli/menu.py`) with the demo. Pass an offline `title` such as "Swedavia FlightInfo API v2 – OFFLINE sample data (ARN, 24 Nov 2026)".
+- From 13b's review: offline mode's "not supported" message plus the live-API hint is about 400 characters. Shorten `SUPPORTED` in `api/offline.py` to one sentence (the offline title already explains the sample). Expected offline: the "Cancelled flights" preset always gives that message.
+- From 13b's review: offline heartbeats show "OK, 0 ms (HTTP 200) – Offline mode: …" five times, and "0/0/0 ms". Consider a single ping offline, or no latency figures for offline health.

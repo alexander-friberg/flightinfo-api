@@ -296,3 +296,25 @@ for Phases 2–4 of `documentation.md` and for the video.
   - The airport-line format, and the CEST snapshot using a hand-built flight (both above).
   - The pager gained an `empty_message` parameter, so destinations (13b) can say something other than "No flights found.".
 - **Live API calls used:** 0
+
+## Task 13b – CLI menu and option flows (2026-11-24)
+- **Built:**
+  - `cli/menu.py`:
+    - `App`, the bundle of everything the menu needs: console, flight source, city lookup, a "today" function, a sleep function, and the title.
+    - `run_menu(app)`: the original's six options in English plus "7. Destination overview".
+  - `cli/destinations.py`: `run_destination_overview`, the original `destinationer.py` flow as option 7.
+  - `tests/test_menu.py` and `tests/test_cli_destinations.py` (39 tests, 498 total).
+- **Decisions:**
+  - **A dispatch table, not an if/elif chain:** the options live in one dict, `{"1": (label, handler), …}`. The menu prints the labels from it and calls the chosen handler, so adding or renaming an option is a one-line change in one place.
+  - **One place for errors:** every option runs inside the same `try / except ApiError`, which prints `Error: <message>` on one line and goes back to the menu. This covers API failures (Swedavia down, quota) and input the services reject (a malformed flight number), so no option has its own error handling and none can crash the app with a known error.
+  - **Everything injected through `App`:** the menu never creates a client, reads the clock or sleeps for real. The tests build an `App` from `ScriptedConsole`, `FakeFlightSource`, a fixed date and a recording sleep, and drive complete sessions as lists of answers ("7", "arn", "", "germany", "3", "q"). Task 14 builds the real `App`.
+  - **The heartbeat output follows the task 11 note:** failed pings never show a time, so there's no "0.0 ms" for something that never answered.
+  - Option 6 prints a placeholder until the demo exists (task 14), marked as a shortcut in the code.
+- **Problems & solutions:**
+  - **A missing menu line:** the menu handled `q` but never printed `q. Quit`; the first test of the menu text caught it.
+  - **The test console didn't behave like a terminal:** a flight card is one multi-line string, so `ScriptedConsole` recorded it as a single "line" and the tests couldn't find `[1] → SK1 …`. The fake now splits on newlines, as `print` shows it. When a fake differs from the real thing, fix the fake.
+  - **A crash on unusual input:** the reviewer found that typing `²` at option 4's "Choose 1-5" would crash the app. `"²".isdigit()` is True, but `int("²")` raises `ValueError`, which isn't an `ApiError`, so the menu wouldn't catch it. The answer is now compared against the allowed strings `"1"`–`"5"`, and a test types `²`. Lesson: `isdigit()` means "is a Unicode digit", not "is 0–9".
+  - **Smoke test on real data:** I ran the real menu with the real offline source and scripted answers. Search, the destination table (filter "germany": Frankfurt 18, Berlin 8, Munich 8, …) and the offline "Cancelled flights" message all behaved. It also showed that offline mode's message is about 400 characters and offline heartbeats show "0 ms"; both are noted for task 14, which owns offline wiring.
+  - The reviewer pointed out that option 7's errors weren't covered by the error test, and that the table header appeared above "No destinations found."; both fixed.
+- **Deviations from plan:** none. Follow-ups for task 14 are in its Notes.
+- **Live API calls used:** 0
