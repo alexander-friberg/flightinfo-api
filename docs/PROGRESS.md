@@ -180,3 +180,20 @@ for Phases 2–4 of `documentation.md` and for the video.
   - The first version only checked key-scrubbing on the 429 path. The reviewer noticed that the 400-on-query path also quotes Swedavia's text, so a key-echoing 400 is now tested as well.
 - **Deviations from plan:** the live contract test now uses the app's `DEFAULT_BASE_URL` (deferred from task 05). The one-off recorder script keeps its own copy.
 - **Live API calls used:** 0
+
+## Task 08 – Short-lived response cache (2026-11-24)
+- **Built:** `api/caching.py`, `CachingFlightSource(inner, ttl_s, clock)`. It wraps any `FlightSource` and is itself a `FlightSource`, so nothing that uses it can tell the difference.
+  - Arrivals/departures are remembered per (airport, day), and queries per filter string, for `ttl_s` seconds (120 by default, from task 03's settings).
+  - `health()` always reaches the inner source, errors are never stored, and a TTL of 0 or less switches caching off.
+  - `tests/test_caching.py` has 16 tests using `FakeFlightSource` and a fake clock that the test moves forward by hand (238 total).
+- **Decisions:**
+  - **Composition instead of inheritance (a decorator):** the cache doesn't extend `SwedaviaClient`. It *wraps* a `FlightSource`, so the same cache works in front of the real client, the offline source (task 09) or a test fake. This is the dependency-injection design paying off: the composition root (task 14) decides whether to put it in front.
+  - **An injected clock:** expiry is tested exactly (just before the TTL is a hit, exactly at the TTL is a miss) without waiting two minutes. The default is `time.monotonic` rather than the wall clock, because wall time can jump (NTP sync, daylight saving) and a cache shouldn't.
+  - **Defensive copies both ways:** callers get a copy, and the cache stores a copy, so neither a caller nor the inner source can change a cached answer afterwards.
+  - Empty results are cached too, so a quiet airport isn't fetched again and again.
+  - No eviction. One interactive session only ever asks for a few combinations; this is marked as a `# shortcut:` in the code, with when to change it.
+- **Problems & solutions:**
+  - **A test that couldn't fail:** run against a cache that never caches, 8 of the 14 first tests still passed. That's expected: "health is never cached", "errors aren't cached" and "TTL 0 means no cache" are things a cache must *not* do, so a cache that does nothing meets them trivially. They exist to stop the real cache from caching too much. The 6 positive tests did fail, which proves they test caching.
+  - The reviewer spotted that the store-side copy wasn't tested: the fake always returns fresh lists, so removing that copy broke nothing. A new test uses an inner source that changes its list after returning it. I removed the copy temporarily and confirmed that the test then fails.
+- **Deviations from plan:** none.
+- **Live API calls used:** 0
