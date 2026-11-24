@@ -36,7 +36,7 @@ def test_checks_job_runs_every_local_check_on_both_python_versions(workflow: str
     checks = section(workflow, "\n  checks:", "\n  secrets:")
     assert re.search(r"python-version:\s*\[\s*\"3\.12\",\s*\"3\.13\"\s*\]", checks)
     assert re.search(
-        r"astral-sh/setup-uv@\S+\s+with:\s+python-version:\s*\$\{\{\s*matrix\.python-version\s*\}\}",
+        r"astral-sh/setup-uv@\S+(?:\s+#[^\n]*)?\s+with:\s+python-version:\s*\$\{\{\s*matrix\.python-version\s*\}\}",
         checks,
     ), "the matrix version must reach setup-uv, or both legs run the same Python"
     for command in (
