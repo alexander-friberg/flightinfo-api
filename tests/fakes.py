@@ -1,9 +1,10 @@
 """Hand-written test doubles. They behave like the real thing with canned data."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import date
 
 from flightboard.api.errors import ApiError
+from flightboard.cli.io import Console
 from flightboard.domain.models import Flight, HealthStatus
 
 HEALTHY = HealthStatus(ok=True, status_code=200, latency_ms=25.0)
@@ -62,3 +63,26 @@ class FakeFlightSource:
         if self.error is not None:
             raise self.error
         return list(flights)
+
+
+class ScriptedConsole:
+    """Builds a `Console` whose input is a fixed script and whose output is recorded."""
+
+    def __init__(self, answers: Iterable[str] = ()) -> None:
+        self._answers = list(answers)
+        self.prompts: list[str] = []
+        self.lines: list[str] = []
+        self.console = Console(read=self._read, write=self.lines.append)
+
+    @property
+    def output(self) -> str:
+        return "\n".join(self.lines)
+
+    @property
+    def unused_answers(self) -> list[str]:
+        return list(self._answers)
+
+    def _read(self, prompt: str) -> str:
+        self.prompts.append(prompt)
+        assert self._answers, f"the program asked {prompt!r} but the script has no answers left"
+        return self._answers.pop(0)

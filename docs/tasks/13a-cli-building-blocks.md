@@ -1,5 +1,5 @@
 # 13a – CLI building blocks: console, prompts, flight card, paging
-Status: todo
+Status: done
 Owner: agent
 Depends on: 04
 
@@ -13,14 +13,19 @@ card, and paging. The menu and the option flows that use them are task 13b.
 - `docs/documentation.md` → DI table rows "User input" / "Output"
 
 ## Acceptance criteria
-- [ ] `cli/io.py` (or similar): a small `Console` holding injected `read: Callable[[str], str]` and `write: Callable[[str], None]`
-- [ ] `cli/prompts.py`: `choose_airport(console)` lists the 10 airports as `IATA – name` in the original's order, asks "Enter IATA code or city name (e.g. ARN or Visby)", uses `resolve_airport`, and re-prompts with "Unknown airport, try again." on bad input
-- [ ] `choose_date(console, today: date)` accepts `YYYY-MM-DD`, `now`, `today`, `tomorrow`, `yesterday` and empty input (= today), case-insensitively, and re-prompts on anything else. `today` is passed in, never read from the system clock here
-- [ ] `cli/render.py`: pure functions from `Flight` to the original's card layout (research.md "Flight (as displayed)"): `[N] → ID  |  Airline  (IATA)`, other airport as name + IATA, the queried airport with its name filled in from `AIRPORTS`, `Terminal : …    Gate: …`, times as `HH:MM UTC → HH:MM CET/CEST`, `–` for missing times and `N/A` for other missing values
-- [ ] `cli/pager.py` (or in render): 50 flights per page, then `── Showing N/M ──  (K left)` and `[Enter] next page | [a] show all | [q] back to menu`
-- [ ] Tests with scripted input and captured output: airport prompt (codes, city names, re-prompt), every date keyword and empty input plus a re-prompt, paging (Enter / `a` / `q`, the counter text, a list shorter than one page, an empty list), render output for one arrival and one departure fixture flight (snapshot-style string comparison, including a CET and a CEST time)
+- [x] `cli/io.py` (or similar): a small `Console` holding injected `read: Callable[[str], str]` and `write: Callable[[str], None]`
+- [x] `cli/prompts.py`: `choose_airport(console)` lists the 10 airports as `IATA – name` in the original's order, asks "Enter IATA code or city name (e.g. ARN or Visby)", uses `resolve_airport`, and re-prompts with "Unknown airport, try again." on bad input
+- [x] `choose_date(console, today: date)` accepts `YYYY-MM-DD`, `now`, `today`, `tomorrow`, `yesterday` and empty input (= today), case-insensitively, and re-prompts on anything else. `today` is passed in, never read from the system clock here
+- [x] `cli/render.py`: pure functions from `Flight` to the original's card layout (research.md "Flight (as displayed)"): `[N] → ID  |  Airline  (IATA)`, other airport as name + IATA, the queried airport with its name filled in from `AIRPORTS`, `Terminal : …    Gate: …`, times as `HH:MM UTC → HH:MM CET/CEST`, `–` for missing times and `N/A` for other missing values
+- [x] `cli/pager.py` (or in render): 50 flights per page, then `── Showing N/M ──  (K left)` and `[Enter] next page | [a] show all | [q] back to menu`
+- [x] Tests with scripted input and captured output: airport prompt (codes, city names, re-prompt), every date keyword and empty input plus a re-prompt, paging (Enter / `a` / `q`, the counter text, a list shorter than one page, an empty list), render output for one arrival and one departure fixture flight (snapshot-style string comparison, including a CET and a CEST time)
 
 ## Out of scope
 The menu, the option flows, error handling at menu level (task 13b). Wiring real dependencies (task 14).
 
 ## Notes
+- Airport lines are `Name (IATA)` for both airports (decision recorded in research.md). The card ends with the original's `─` rule line, which research.md now records too.
+- Baggage is shown for arrivals only. Unknown D/I shows `N/A`.
+- The CEST snapshot uses a hand-built July flight: the recorded fixtures are all November (CET).
+- `page(..., empty_message=...)` defaults to "No flights found."; task 13b can pass its own text for destinations.
+- `ScriptedConsole` (scripted input and captured output for CLI tests) lives in `tests/fakes.py`.

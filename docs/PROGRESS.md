@@ -273,3 +273,26 @@ for Phases 2–4 of `documentation.md` and for the video.
   - The original's "263 cities / 59 countries" doesn't apply: this year's file has 345/67. The data test checks the counts the build script reported, plus known cities (Tirana → ALBANIA) and that no two spellings disagree on a country.
 - **Deviations from plan:** `fold()` in `domain/airports.py` became public for reuse. research.md's alias table and city count were corrected, and a note was added to task 13 about the function signature.
 - **Live API calls used:** 0
+
+## Task 13a – CLI building blocks: console, prompts, flight card, paging (2026-11-24)
+- **Built:**
+  - `cli/io.py`: `Console(read, write)`.
+  - `cli/prompts.py`: `choose_airport` and `choose_date`.
+  - `cli/render.py`: `render_flight`, the original's flight card.
+  - `cli/pager.py`: `page`, 50 per page with Enter / `a` / `q`.
+  - `ScriptedConsole` in `tests/fakes.py`.
+  - 42 new tests (459 total).
+- **Decisions:**
+  - **Input and output are injected.** The CLI never calls `input()` or `print()` itself; it receives a `Console` holding two functions. The app will pass `input`/`print` (task 14). Tests pass `ScriptedConsole`, which answers from a list and records every line, so a whole conversation can be tested as plain strings. "Today" is passed in too, so the date prompt never reads the system clock.
+  - **Snapshot tests for the card:** the expected card is written out character for character, so any spacing change fails a test. Two snapshots use real recorded flights: FR4679, an arrival whose local time crosses midnight (23:50 UTC → 00:50 CET), and AY808, a "Deleted" departure with no gate. The fixtures are November data (CET), so the summer (CEST) snapshot uses a hand-built July flight.
+  - **Faithful layout, one deliberate change:** labels and their uneven spacing are copied from the video. The original showed the other airport as `London LHR` and left the queried airport's name blank (`(ARN)`). The recreation writes both as `Name (IATA)` and fills the name in from `AIRPORTS`. This is recorded as a decision in research.md.
+  - **Strict dates:** `YYYY-MM-DD` must have exactly that shape before it's parsed, because Python's `date.fromisoformat` also accepts `20261124`. The keywords now/today/tomorrow/yesterday and empty input (= today) work in any letter case.
+  - **Paging asks only when needed:** no prompt when everything fits on one page; `a` shows the rest without asking again; any other answer asks again.
+- **Problems & solutions:**
+  - **A detail missing from the research:** the reviewer flagged the `─` line under each card as undocumented. Checking the video screenshot again showed it *is* there; it had been dropped when the card was copied into research.md. research.md is fixed, so the code and the record agree.
+  - **Extra spaces in API names:** a new test showed that `"London  LHR "` (double and trailing spaces) would print as `London  LHR (LHR)`. Names are now whitespace-normalised before the code is stripped, and a bare `"LHR"` prints as `(LHR)`.
+  - mypy caught a variable reused with two types in `choose_airport` (a `str` in the listing loop, then `str | None` from `resolve_airport`), which was renamed. ruff asked for Python 3.12's own generic syntax, `def page[T](...)`, instead of a `TypeVar`.
+- **Deviations from plan:**
+  - The airport-line format, and the CEST snapshot using a hand-built flight (both above).
+  - The pager gained an `empty_message` parameter, so destinations (13b) can say something other than "No flights found.".
+- **Live API calls used:** 0

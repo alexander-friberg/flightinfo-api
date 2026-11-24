@@ -181,7 +181,10 @@ The original's flight card, as shown in the video (an arrival at ARN, labels as 
   Est   : –
   Actual: –
   D/I     : I
+  ────────────────────────────────────────
 ```
+- Each card ends with a horizontal rule (under `D/I`, before the paging line). It was left out
+  when the card was first transcribed, and added in task 13a.
 - `[50]` is the running index in the list; `→` precedes the flight id.
 - The airline and the other airport are shown as name + IATA code.
 - The queried airport's name is blank: only `(ARN)` is shown.
@@ -392,6 +395,7 @@ The API has a dedicated `GET /heartBeat` endpoint, so each ping is one call to i
 | Offline mode | `--offline` flag using recorded sample data | Demos and the video without network, key or quota |
 | Flight search | One OData query (`flightId`, `scheduled`; no airport) | Half the quota cost of fetching both lists, and finds the flight at any airport |
 | Flight card and paging | Same layout as the original (UTC → local, `–`/`N/A`), 50 per page with Enter / `a` / `q` | Faithful to the video; queried airport's name filled in |
+| Airport lines on the card | Both as `Name (IATA)`: `London (LHR)`, `Stockholm Arlanda (ARN)`. A code the API already put in the name isn't repeated | The original mixed `London LHR` with a blank `(ARN)`; one consistent format, with the missing name filled in |
 | Query size and paging | Always send an explicit `count` (1000); don't use `continuationtoken` | The default of 25 silently truncates results; the token is a change feed, not paging |
 | Destinations helper | Functions reached from main-menu option 7; no separate entry point | Same options as the original, one implementation, one way to start the app |
 | Development workflow | Agentic: Claude Code works from task files; Alex reviews and commits | See "Development workflow" in `documentation.md` |
