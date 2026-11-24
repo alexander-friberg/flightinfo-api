@@ -50,3 +50,23 @@ for Phases 2–4 of `documentation.md` and for the video.
   - Gitleaks hasn't been run locally (the agent's shell blocks `curl`), so its first real run is in CI. If it reports a false positive, add an allowlist entry in `.gitleaks.toml` with a reason; don't narrow the scan.
 - **Live API calls used:** 0
 - **Pending (Alex):** push and confirm the workflow is green on GitHub, then record the result in the next task's entry.
+
+## Task 03 – Configuration and secrets (2026-11-24)
+- **Built:** `src/flightboard/config.py`.
+  - A frozen `Settings` (`api_key`, `base_url`, `timeout_s`, `cache_ttl_s`), plus `ConfigError`.
+  - `load_settings(env, *, offline=False)`, which reads only the mapping it is given.
+  - A missing or blank `SWEDAVIA_API_KEY` stops the app with a message that says exactly what to do: copy `.env.example` to `.env`, then run with `uv run --env-file .env`, or use `--offline`.
+  - `repr()`/`str()` show `api_key='***'`.
+  - `SWEDAVIA_TIMEOUT_S` / `SWEDAVIA_CACHE_TTL_S` overrides are validated, and an error names the variable and the bad value.
+  - `tests/test_config.py` (21 tests) uses plain dicts as the environment.
+- **Decisions:**
+  - **The environment is a parameter, not `os.environ`.** This is dependency injection at its smallest: tests pass a dict, and only the composition root (task 14) will pass the real `os.environ`. A test proves that a key in the real environment is ignored.
+  - **The key is masked in `repr`, not just hidden.** `api_key='***'` shows that a key *is* set, which helps debugging, without showing it.
+  - **Offline mode drops the key**, even if one is set. The reviewer spotted that "empty key = offline" was only true one way. Blanking it makes offline mode unable to reach the API at all.
+  - **Defaults:** timeout 10 s, cache TTL 120 s. A TTL of 0 or less is allowed, because task 08 uses it to switch caching off. A timeout must be > 0, and `nan`/`inf` are rejected (Python's `float()` accepts them).
+- **Problems & solutions:**
+  - **CI failed on its first run** (Task 02's pending check). GitHub reported "Unable to resolve action `astral-sh/setup-uv@v10`". That action publishes no floating major tag. Its README pins a full commit SHA with a `# v10.4.0` comment, which was misread as "use @v10". Confirmed via the GitHub API that `v10` doesn't exist and `v10.4.0` is commit `1db35dd…`, then pinned that SHA. The `secrets` job passed on that run, so the full-history gitleaks scan of the repo is clean. Lesson: a workflow can only be truly tested by running it on GitHub; local text tests can check its shape, not whether a tag exists. This is committed separately as a CI fix, before this task.
+  - `dataclasses.asdict()` and `vars()` bypass the masked `repr`, so the class docstring warns never to log them.
+- **Deviations from plan:** none for the task itself. The CI fix (`.github/workflows/ci.yml`, `tests/test_ci_workflow.py`) was made in the same session but belongs in its own commit.
+- **Live API calls used:** 0
+- **Pending (Alex):** after pushing the CI fix, confirm both `checks` jobs go green.
