@@ -27,3 +27,4 @@ English, built so it can be tested with scripted input and captured output.
 Wiring real dependencies and `--offline` (task 14).
 
 ## Notes
+- From task 11: a ping that failed without a response has `status_code=None` and `latency_ms=0.0`. Print latency only for pings that got a response, so the screen never shows "0.0 ms" for a failure.

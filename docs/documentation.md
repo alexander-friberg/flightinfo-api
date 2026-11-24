@@ -160,7 +160,7 @@ A side benefit: the same seam lets the app run in **offline mode** (`--offline`)
 | Unit: parsing | real fixture → correct `Flight`, ghost entries removed, missing fields don't crash | recorded JSON fixtures |
 | Client | correct URL and date format, subscription-key header sent, 401/429/5xx/timeout → right error type | `httpx.MockTransport` |
 | Services | search finds/doesn't find, destination counts and filters, unknown city → "Unknown" | `FakeFlightSource` |
-| Heartbeat | N pings, min/avg/max latency, partial failure | `FakeClock` + fake source (no real sleeping) |
+| Heartbeat | N pings, min/avg/max latency, partial failure | recording fake sleep + fake source with scripted results (no real sleeping) |
 | CLI | menu dispatch, invalid input re-prompts, quit works | scripted input + captured output |
 | Contract (optional, manual) | the real API still returns what the parser expects | marked `@pytest.mark.live`, **excluded by default** |
 

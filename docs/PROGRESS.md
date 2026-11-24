@@ -237,3 +237,19 @@ for Phases 2–4 of `documentation.md` and for the video.
   - New tests run search and the presets against the **real** offline source. That locks in task 09's claim that its matcher understands exactly the strings this service builds; before, two modules agreed only by convention.
 - **Deviations from plan:** none. The "by status → CAN" choice is recorded in the task file.
 - **Live API calls used:** 0
+
+## Task 11 – Health check heartbeat (2026-11-24)
+- **Built:** `services/health.py`: `heartbeat(source, count=5, interval_s=2.0, sleep=time.sleep, on_result=None)` returns a `HeartbeatReport`. The report holds every ping's result, successes and failures, and min/avg/max latency over the successful pings (`None` when all fail). `FakeFlightSource` can now play back a scripted series of health results and errors. 14 new tests (342 total).
+- **Decisions:**
+  - **Like `ping`:** N calls to `/heartBeat` at an interval, then a summary. This is the research decision: it looks like a heartbeat but stays cheap.
+  - **`sleep` is injected.** The real app passes `time.sleep`; tests pass `sleeps.append`, which records how long it *would* have waited. The whole series runs instantly, and a test can check the exact wait pattern: between pings, never after the last one.
+  - **The summary can't contradict the data.** The counts and latency statistics are computed from the list of results rather than stored separately, and the report is frozen.
+  - **One bad ping doesn't stop the series.** If a ping raises an `ApiError` (e.g. 429), it's recorded as a failed ping and the next one still runs, as the task requires.
+  - **Quota cost is visible in the code:** the defaults (5 pings, 2 s) are named constants with a comment saying one run costs 5 calls (about 0.5% of a 1 000-call month).
+  - An `on_result(number, status)` callback lets the menu (task 13) print each ping as it arrives, instead of waiting ~8 s for the whole report.
+- **Problems & solutions:**
+  - The first immutability test only checked that `results` was a tuple, so it would still pass if the report stopped being frozen. The reviewer pointed this out; the test now tries to change the report and expects an error. Lesson: a test for a guarantee must fail when the guarantee is removed.
+  - The reviewer noticed that a failed ping has `latency_ms=0.0`, which a careless printer would show as "0.0 ms". That's a display concern, so a note was added to task 13 rather than changing the data.
+  - `documentation.md` said the heartbeat tests use a `FakeClock`. They use a recording fake sleep instead (the latency is measured inside the client, task 07). One line corrected.
+- **Deviations from plan:** `tests/fakes.py` gained the scripted health mode. Small doc fixes in `documentation.md` and task 13's notes.
+- **Live API calls used:** 0

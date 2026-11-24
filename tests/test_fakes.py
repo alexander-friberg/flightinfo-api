@@ -59,3 +59,15 @@ def test_fake_returns_copies_so_callers_cannot_change_its_data() -> None:
     fake.arrivals("ARN", DAY).clear()
 
     assert fake.arrivals("ARN", DAY) == [ARRIVAL]
+
+
+def test_fake_health_can_play_a_script_of_results_and_errors() -> None:
+    up = HealthStatus(ok=True, status_code=200, latency_ms=5.0)
+    fake = FakeFlightSource(health=[up, ApiUnavailableError("down"), up])
+
+    assert fake.health() == up
+    with pytest.raises(ApiUnavailableError):
+        fake.health()
+    assert fake.health() == up
+    with pytest.raises(AssertionError, match="script"):
+        fake.health()

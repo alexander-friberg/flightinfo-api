@@ -1,5 +1,6 @@
 """Hand-written test doubles. They behave like the real thing with canned data."""
 
+from collections.abc import Sequence
 from datetime import date
 
 from flightboard.api.errors import ApiError
@@ -12,6 +13,8 @@ class FakeFlightSource:
     """A `FlightSource` that returns canned flights and records every call.
 
     Set `error` to make every method (except `health`) raise it, like a failing API would.
+    `health` is either one status returned every time, or a script played in order, where an
+    `ApiError` entry is raised instead of returned.
     """
 
     def __init__(
@@ -19,13 +22,14 @@ class FakeFlightSource:
         arrivals: list[Flight] | None = None,
         departures: list[Flight] | None = None,
         query: list[Flight] | None = None,
-        health: HealthStatus = HEALTHY,
+        health: HealthStatus | Sequence[HealthStatus | ApiError] = HEALTHY,
         error: ApiError | None = None,
     ) -> None:
         self._arrivals = list(arrivals or [])
         self._departures = list(departures or [])
         self._query = list(query or [])
-        self._health = health
+        self._health = health if isinstance(health, HealthStatus) else tuple(health)
+        self._health_calls = 0
         self.error = error
         self.calls: list[tuple[str, tuple[object, ...]]] = []
 
@@ -44,7 +48,14 @@ class FakeFlightSource:
 
     def health(self) -> HealthStatus:
         self.calls.append(("health", ()))
-        return self._health
+        if isinstance(self._health, HealthStatus):
+            return self._health
+        assert self._health_calls < len(self._health), "health() called more often than scripted"
+        step = self._health[self._health_calls]
+        self._health_calls += 1
+        if isinstance(step, ApiError):
+            raise step
+        return step
 
     def _answer(self, name: str, args: tuple[object, ...], flights: list[Flight]) -> list[Flight]:
         self.calls.append((name, args))
