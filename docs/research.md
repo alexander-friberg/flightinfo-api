@@ -31,8 +31,8 @@ Consequences for the design:
 ### Endpoints (FlightInfo v2)
 | Purpose | Endpoint (relative to `https://api.swedavia.se/flightinfo/v2`) | Documented responses | Used by menu option |
 |---|---|---|---|
-| Arrivals for one airport and day | `GET /{iata}/arrivals/{yyyy-mm-dd}` | 200, 204, 304, 400, 500 | 1. View arrivals, 7. Destination overview |
-| Departures for one airport and day | `GET /{iata}/departures/{yyyy-mm-dd}` | 200, 204, 304, 400, 500 | 2. View departures, 7. Destination overview |
+| Arrivals for one airport and day | `GET /{iata}/arrivals/{yyyy-mm-dd}` | 200, 204, 304, 400, 500 | 1. View arrivals (+ destination overview) |
+| Departures for one airport and day | `GET /{iata}/departures/{yyyy-mm-dd}` | 200, 204, 304, 400, 500 | 2. View departures (+ destination overview) |
 | Free-form OData query | `GET /query?filter=<odata>&count=<n>` | 200, 429 | 3. Search flight, 4. Run OData queries |
 | Health | `GET /heartBeat` (docs say `{}`; really returns `"IsAlive"`) | 200 | 5. Check API health |
 
@@ -367,7 +367,11 @@ The API has a dedicated `GET /heartBeat` endpoint, so each ping is one call to i
 ### Q: How is destinationer.py reached, and what does 1–3 mean?
 > The video shows a script with its own `main()` that runs once. It may also be called from the main menu; the video doesn't settle which. The three choices are most likely arrivals / departures / both (an assumption, not shown).
 >
-> **Decision:** recreate the behaviour, not the file layout. The logic lives in functions: `services/destinations.py` (data) and `cli/destinations.py` (the prompt flow, same order and options as the original). It is reached from main-menu option 7 "Destination overview". There is one entry point only: running a second script to fetch data is redundant when a function call does the same.
+> **Decision (corrected 2026-11-24):** recreate the behaviour, not the file layout, and **keep the menu exactly as in the video: six options**. The overview is offered after options 1 and 2 have listed their flights ("Show destination overview (cities, countries, flight counts)? [y/N]"). `y` asks for the same optional filter as the original and shows the city | country | count table, built from the flights just listed, so it costs no extra API call. The logic lives in `services/destinations.py` (`summarise_destinations`) and `cli/destinations.py`. There is one entry point only.
+>
+> Consequences: the direction comes from the option (1 arrivals, 2 departures), so the original's "3 both" choice isn't in the UI; `destination_overview(..., Which.BOTH)` still exists as a library function.
+>
+> *History:* this was first implemented as a seventh menu option. That came from a misunderstanding: Alex's "drop the wrapper" was read as approving the whole proposal (option 7 plus a separate command), when it only rejected the separate command. See PROGRESS.md, "Correction: no menu option 7".
 
 ### Q: How was city_country.json built from the Excel file?
 > Unknown. **Decision:** write a small, separate build script (`scripts/build_city_country.py`) so the JSON is reproducible instead of hand-made. It is not part of the runtime app.
@@ -397,5 +401,5 @@ The API has a dedicated `GET /heartBeat` endpoint, so each ping is one call to i
 | Flight card and paging | Same layout as the original (UTC → local, `–`/`N/A`), 50 per page with Enter / `a` / `q` | Faithful to the video; queried airport's name filled in |
 | Airport lines on the card | Both as `Name (IATA)`: `London (LHR)`, `Stockholm Arlanda (ARN)`. A code the API already put in the name isn't repeated | The original mixed `London LHR` with a blank `(ARN)`; one consistent format, with the missing name filled in |
 | Query size and paging | Always send an explicit `count` (1000); don't use `continuationtoken` | The default of 25 silently truncates results; the token is a change feed, not paging |
-| Destinations helper | Functions reached from main-menu option 7; no separate entry point | Same options as the original, one implementation, one way to start the app |
+| Destinations helper | Offered after options 1 and 2 (y/N), from the flights just listed; menu keeps the original six options; no separate entry point | Faithful menu, no extra API call, one way to start the app |
 | Development workflow | Agentic: Claude Code works from task files; Alex reviews and commits | See "Development workflow" in `documentation.md` |

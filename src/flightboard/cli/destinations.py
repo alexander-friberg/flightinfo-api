@@ -1,29 +1,28 @@
-"""Menu option 7: the original's `destinationer.py` flow, asked in the same order."""
+"""The destination overview (the original's `destinationer.py`), offered after options 1 and 2."""
 
-from datetime import date
+from collections.abc import Sequence
 
-from flightboard.api.protocols import FlightSource
 from flightboard.cli.io import Console
 from flightboard.cli.pager import page
-from flightboard.cli.prompts import choose_airport, choose_date
 from flightboard.data.lookup import CityCountryLookup
-from flightboard.services.destinations import DestinationRow, Which, destination_overview
+from flightboard.domain.models import Flight
+from flightboard.services.destinations import DestinationRow, summarise_destinations
 
+OFFER_PROMPT = "Show destination overview (cities, countries, flight counts)? [y/N]: "
 FILTER_PROMPT = "Filter? (country or city, Enter = none): "
-WHICH_PROMPT = "Show 1 arrivals / 2 departures / 3 both: "
 _ROW = "{city:<28} {country:<28} {count:>7}"
 
 
-def run_destination_overview(
-    console: Console, source: FlightSource, lookup: CityCountryLookup, today: date
+def offer_destination_overview(
+    console: Console, flights: Sequence[Flight], lookup: CityCountryLookup
 ) -> None:
-    """Airport, date, optional filter, then 1/2/3; show the table and the unmatched cities."""
-    airport = choose_airport(console)
-    day = choose_date(console, today)
+    """Offer the city | country | count table for the flights just listed (y/N, then a filter)."""
+    if not flights:
+        return
+    if console.read(OFFER_PROMPT).strip().lower() not in ("y", "yes"):
+        return
     match = console.read(FILTER_PROMPT).strip() or None
-    which = _choose_which(console)
-
-    overview = destination_overview(source, lookup, airport, day, which, match=match)
+    overview = summarise_destinations(flights, lookup, match)
 
     if overview.rows:
         console.write(_ROW.format(city="City", country="Country", count="Flights"))
@@ -32,14 +31,6 @@ def run_destination_overview(
         console.write(
             "Not in the statistics file (country unknown): " + ", ".join(overview.unmatched)
         )
-
-
-def _choose_which(console: Console) -> Which:
-    while True:
-        answer = console.read(WHICH_PROMPT).strip()
-        if answer in ("1", "2", "3"):
-            return Which(answer)
-        console.write("Type 1, 2 or 3.")
 
 
 def _render_row(_: int, row: DestinationRow) -> str:

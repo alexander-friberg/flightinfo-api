@@ -1,11 +1,11 @@
-"""The main menu: the original's six options plus the destination overview."""
+"""The main menu: the original's six options."""
 
 from collections.abc import Callable
 
 from flightboard.api.errors import ApiError
 from flightboard.cli.app import App
 from flightboard.cli.demo import run_demo
-from flightboard.cli.destinations import run_destination_overview
+from flightboard.cli.destinations import offer_destination_overview
 from flightboard.cli.pager import page
 from flightboard.cli.prompts import choose_airport, choose_date
 from flightboard.cli.render import render_flight, render_heartbeat_summary, render_ping
@@ -48,12 +48,16 @@ def _show(app: App, flights: list[Flight]) -> None:
 
 def _arrivals(app: App) -> None:
     airport = choose_airport(app.console)
-    _show(app, app.flights.arrivals(airport, choose_date(app.console, app.today())))
+    flights = app.flights.arrivals(airport, choose_date(app.console, app.today()))
+    _show(app, flights)
+    offer_destination_overview(app.console, flights, app.lookup)
 
 
 def _departures(app: App) -> None:
     airport = choose_airport(app.console)
-    _show(app, app.flights.departures(airport, choose_date(app.console, app.today())))
+    flights = app.flights.departures(airport, choose_date(app.console, app.today()))
+    _show(app, flights)
+    offer_destination_overview(app.console, flights, app.lookup)
 
 
 def _search(app: App) -> None:
@@ -94,10 +98,6 @@ def _health(app: App) -> None:
     app.console.write(render_heartbeat_summary(report))
 
 
-def _destinations(app: App) -> None:
-    run_destination_overview(app.console, app.source, app.lookup, app.today())
-
-
 OPTIONS: dict[str, tuple[str, Handler]] = {
     "1": ("Arrivals for an airport & date", _arrivals),
     "2": ("Departures for an airport & date", _departures),
@@ -105,5 +105,4 @@ OPTIONS: dict[str, tuple[str, Handler]] = {
     "4": ("OData query (query endpoint)", _odata),
     "5": ("HeartBeat – API health check", _health),
     "6": ("Demonstrate all endpoints automatically", run_demo),
-    "7": ("Destination overview", _destinations),
 }

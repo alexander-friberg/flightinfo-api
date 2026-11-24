@@ -50,10 +50,10 @@ def run(
 # --- the menu itself ----------------------------------------------------------------------
 
 
-def test_menu_shows_the_originals_options_in_english_plus_destinations() -> None:
+def test_menu_shows_exactly_the_originals_six_options_in_english() -> None:
     script, _, _ = run(["q"])
 
-    assert script.lines[:9] == [
+    assert script.lines[:8] == [
         "Swedavia FlightInfo API v2 – Python client",
         "1. Arrivals for an airport & date",
         "2. Departures for an airport & date",
@@ -61,7 +61,6 @@ def test_menu_shows_the_originals_options_in_english_plus_destinations() -> None
         "4. OData query (query endpoint)",
         "5. HeartBeat – API health check",
         "6. Demonstrate all endpoints automatically",
-        "7. Destination overview",
         "q. Quit",
     ]
     assert script.prompts == ["Choose an option: "]
@@ -103,14 +102,14 @@ def test_choices_ignore_case_and_spaces() -> None:
 
 
 def test_option_1_shows_arrivals_for_the_chosen_airport_and_date() -> None:
-    script, source, _ = run(["1", "visby", "tomorrow", "q"])
+    script, source, _ = run(["1", "visby", "tomorrow", "", "q"])
 
     assert source.calls == [("arrivals", ("VBY", date(2026, 11, 25)))]
     assert "[1] → SK1  |  N/A" in script.lines
 
 
 def test_option_2_shows_departures() -> None:
-    script, source, _ = run(["2", "arn", "", "q"])
+    script, source, _ = run(["2", "arn", "", "", "q"])
 
     assert source.calls == [("departures", ("ARN", TODAY))]
     assert "[1] → SK2  |  N/A" in script.lines
@@ -118,7 +117,7 @@ def test_option_2_shows_departures() -> None:
 
 def test_long_lists_are_paged() -> None:
     many = [flight(f"SK{i}") for i in range(60)]
-    script, _, _ = run(["1", "arn", "", "q", "q"], FakeFlightSource(arrivals=many))
+    script, _, _ = run(["1", "arn", "", "q", "", "q"], FakeFlightSource(arrivals=many))
 
     assert "── Showing 50/60 ──  (10 left)" in script.lines
     assert not any(line.startswith("[51]") for line in script.lines)
@@ -234,11 +233,34 @@ def test_option_6_runs_the_full_auto_demo() -> None:
     assert sleeps[:4] == [2.5, 2.5, 2.5, 2.5]
 
 
-def test_option_7_shows_the_destination_overview() -> None:
-    script, source, _ = run(["7", "arn", "", "", "3", "q"])
+def test_there_is_no_seventh_option() -> None:
+    script, _, _ = run(["7", "q"])
 
-    assert [name for name, _ in source.calls] == ["arrivals", "departures"]
-    assert any(line.split() == ["Oslo", "NORWAY", "2"] for line in script.lines)
+    assert "Unknown choice, try again." in script.lines
+
+
+@pytest.mark.parametrize(("option", "call"), [("1", "arrivals"), ("2", "departures")])
+def test_options_1_and_2_offer_the_destination_overview_from_the_same_fetch(
+    option: str, call: str
+) -> None:
+    script, source, _ = run([option, "arn", "", "y", "", "q"])
+
+    assert "Show destination overview (cities, countries, flight counts)? [y/N]: " in script.prompts
+    assert any(line.split() == ["Oslo", "NORWAY", "1"] for line in script.lines)
+    assert [name for name, _ in source.calls] == [call]
+
+
+def test_declining_the_overview_goes_back_to_the_menu() -> None:
+    script, _, _ = run(["1", "arn", "", "n", "q"])
+
+    assert not any(line.split()[:1] == ["City"] for line in script.lines)
+    assert script.lines[-1] == "Goodbye."
+
+
+def test_no_overview_is_offered_for_searches_and_queries() -> None:
+    script, _, _ = run(["3", "AY808", "", "4", "arn", "", "1", "q"])
+
+    assert not any("destination overview" in prompt for prompt in script.prompts)
 
 
 # --- errors -----------------------------------------------------------------------------------
@@ -251,7 +273,6 @@ def test_option_7_shows_the_destination_overview() -> None:
         ("2", ["arn", ""]),
         ("3", ["SK1", ""]),
         ("4", ["arn", "", "1"]),
-        ("7", ["arn", "", "", "1"]),
     ],
 )
 def test_an_api_error_is_one_friendly_line_and_the_menu_continues(

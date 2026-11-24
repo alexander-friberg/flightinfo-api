@@ -355,3 +355,23 @@ for Phases 2–4 of `documentation.md` and for the video.
   - Running online without a key printed the message and exited with 2.
 - **Deviations from plan:** the test-only `transport`/`sleep` parameters on `main`, and `App` moving to its own module.
 - **Live API calls used:** 0. The online path is covered with a fake transport; a real live run is the natural next manual check.
+
+## Correction: no menu option 7 (2026-11-24)
+- **What was wrong:** the recreation had a seventh menu option, "Destination overview". The original's menu (video) has exactly six options.
+- **How it happened:** during planning I proposed two things for `destinationer.py`: a menu option 7, *and* an optional separate command (`python -m flightboard.destinations`). Alex answered "Drop the wrapper". I read that as approval of everything else, so option 7 went into research.md, tasks 12 and 13b, and the code. Alex had only rejected the separate command. Lesson: when someone answers one part of a multi-part proposal, confirm the other parts explicitly instead of assuming silence means yes.
+- **What changed (Alex's decision): the menu keeps the original six options, and the overview is part of options 1 and 2.**
+  - After the arrivals or departures list, the app asks "Show destination overview (cities, countries, flight counts)? [y/N]". Enter means no, so the normal flow costs one keypress at most.
+  - `y` asks for the original's optional filter and shows the same city | country | count table, plus the cities missing from the statistics file.
+  - The overview is built from the flights **already fetched** for the list, through a new pure function `summarise_destinations(flights, lookup, match)`, so it makes no second API call even without the cache. `destination_overview(...)` now fetches and then calls it.
+  - Consequence: the original's "3 both" choice isn't in the UI, because each option has one direction. It remains available as a library function.
+- **Considered:** removing the feature entirely. It's about 250 lines of code, about 500 lines of tests, the city data and the `openpyxl` dev dependency. It was kept, because the original's project description highlights it (the offline city database).
+- **Code:** `cli/destinations.py` now has `offer_destination_overview(console, flights, lookup)`; `run_destination_overview` and the 1–3 prompt are gone. `cli/menu.py` has no option 7; options 1 and 2 call the offer after the pager.
+- **Tests:**
+  - `test_menu.py`: the menu text is six options plus `q`; "7" is now an unknown choice; options 1/2 offer the overview with no extra source call; declining; no offer after search or OData.
+  - `test_cli_destinations.py` was rewritten for the offer flow.
+  - `test_destinations.py` gained tests for `summarise_destinations`.
+  - 521 tests in total.
+- **Manual check:** `--offline`, option 1 at ARN, `y`, filter "germany" showed the six-option menu, the arrivals list, then Frankfurt 9, Berlin 4, Munich 4, Düsseldorf 2, Hamburg 1 (arrivals only).
+- **Docs:** research.md (the endpoints table, the destinationer.py decision with this history, the Decisions row), documentation.md's file tree, and notes in tasks 12 and 13b.
+- **Live API calls used:** 0
+- **Review notes (accepted as-is):** the overview is still offered after `q` in the pager. `q` only stops paging the list, and Enter declines the offer. `destination_overview` and `Which` are now used only by tests; they stay as a library function for the "both" case.

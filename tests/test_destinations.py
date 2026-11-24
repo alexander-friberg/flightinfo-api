@@ -10,6 +10,7 @@ from flightboard.services.destinations import (
     DestinationRow,
     Which,
     destination_overview,
+    summarise_destinations,
 )
 from tests.fakes import FakeFlightSource
 
@@ -156,3 +157,29 @@ def test_errors_propagate_and_bad_airports_are_rejected() -> None:
 def test_which_matches_the_originals_1_to_3_menu() -> None:
     assert [w.value for w in Which] == ["1", "2", "3"]
     assert Which("3") is Which.BOTH
+
+
+# --- summarise_destinations: the same counting, on flights the caller already has ------------
+
+
+def test_summarise_counts_flights_already_fetched_without_any_source() -> None:
+    fetched = arriving_from("Oslo", "London LHR", "Oslo", "Atlantis")
+
+    result = summarise_destinations(fetched, LOOKUP)
+
+    assert result.rows == (
+        DestinationRow("Oslo", "NORWAY", 2),
+        DestinationRow("Atlantis", "Unknown", 1),
+        DestinationRow("London", "GREAT BRITAIN", 1),
+    )
+    assert result.unmatched == ("Atlantis",)
+
+
+def test_summarise_applies_the_filter() -> None:
+    result = summarise_destinations(departing_to("Oslo", "Visby", "Bergen"), LOOKUP, match="norway")
+
+    assert [r.city for r in result.rows] == ["Bergen", "Oslo"]
+
+
+def test_summarise_of_nothing_is_empty() -> None:
+    assert summarise_destinations([], LOOKUP) == DestinationOverview((), ())

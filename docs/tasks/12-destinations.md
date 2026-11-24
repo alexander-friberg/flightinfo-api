@@ -32,3 +32,4 @@ Prompts and menu wiring (task 13b).
 - The JSON is pure Excel data; the API→Excel alias table (`CITY_ALIASES`, 11 entries) lives in `data/lookup.py`. With it, every city in the recorded fixtures resolves except the literal "Unknown".
 - **Filter reading:** the criterion's "country and/or city substring" is implemented as ONE substring that matches city OR country, faithful to the original's single `Filter?` prompt. Filtering city AND country at the same time isn't possible (the original couldn't either).
 - `fold()` in `domain/airports.py` was made public so the lookup and the service reuse the same accent folding.
+- **Corrected 2026-11-24:** there is no menu option 7. The overview is offered after options 1 and 2, built from the flights just listed (`summarise_destinations`). See PROGRESS.md, "Correction: no menu option 7".

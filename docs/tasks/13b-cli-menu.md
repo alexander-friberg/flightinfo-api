@@ -27,3 +27,4 @@ Wiring real dependencies and `--offline`, and the full-auto demo itself (task 14
 - From task 12: the overview is a free function, `destination_overview(source, lookup, airport, day, which, match=None)`, not a service object. Wire it with `functools.partial` (or pass `source` and `lookup` into `run_destination_overview`) rather than redesigning it. `Which("1"|"2"|"3")` maps the 1–3 answer directly.
 - Done: `App(console, source, lookup, today, sleep, title)` is what task 14 must build. `run_menu(app)` is the entry point. Option 6 is a `# shortcut:` placeholder to replace with the demo.
 - Done: an OK ping shows its message if it has one (e.g. offline mode's note); failures never show a time.
+- **Corrected 2026-11-24:** there is no menu option 7. The overview is offered after options 1 and 2, built from the flights just listed (`summarise_destinations`). See PROGRESS.md, "Correction: no menu option 7".

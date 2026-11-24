@@ -1,101 +1,72 @@
-"""Option 7, the destination overview, driven by scripted answers against fake data."""
-
-from datetime import date
+"""The destination overview offered after options 1 and 2, driven by scripted answers."""
 
 import pytest
 
-from flightboard.cli.destinations import WHICH_PROMPT, run_destination_overview
+from flightboard.cli.destinations import FILTER_PROMPT, OFFER_PROMPT, offer_destination_overview
 from flightboard.data.lookup import CityCountryLookup
 from flightboard.domain.models import Direction, Flight
-from tests.fakes import FakeFlightSource, ScriptedConsole
+from tests.fakes import ScriptedConsole
 
-TODAY = date(2026, 11, 24)
 LOOKUP = CityCountryLookup({"Oslo": "NORWAY", "London": "GREAT BRITAIN"})
+FLIGHTS = [
+    Flight(direction=Direction.DEPARTURE, other_airport_name=city)
+    for city in ("Oslo", "London LHR", "Oslo", "Atlantis")
+]
 
 
-def source() -> FakeFlightSource:
-    def arriving(city: str) -> Flight:
-        return Flight(direction=Direction.ARRIVAL, other_airport_name=city)
-
-    def departing(city: str) -> Flight:
-        return Flight(direction=Direction.DEPARTURE, other_airport_name=city)
-
-    return FakeFlightSource(
-        arrivals=[arriving("Oslo"), arriving("London LHR"), arriving("Oslo")],
-        departures=[departing("Atlantis"), departing("Oslo")],
-    )
-
-
-def run(
-    answers: list[str], fake: FakeFlightSource | None = None
-) -> tuple[ScriptedConsole, FakeFlightSource]:
+def run(answers: list[str], flights: list[Flight] = FLIGHTS) -> ScriptedConsole:
     script = ScriptedConsole(answers)
-    fake = fake or source()
-    run_destination_overview(script.console, fake, LOOKUP, TODAY)
+    offer_destination_overview(script.console, flights, LOOKUP)
     assert script.unused_answers == []
-    return script, fake
+    return script
 
 
-def table(script: ScriptedConsole) -> list[list[str]]:
-    rows = [line.split() for line in script.lines]
-    return [r for r in rows if len(r) == 3 and r[2].isdigit()]
+def test_prompts_are_worded_for_the_user() -> None:
+    assert OFFER_PROMPT == "Show destination overview (cities, countries, flight counts)? [y/N]: "
+    assert FILTER_PROMPT == "Filter? (country or city, Enter = none): "
 
 
-def test_asks_in_the_originals_order() -> None:
-    script, _ = run(["arn", "", "", "1"])
+@pytest.mark.parametrize("answer", ["", "n", "N", "no", "x"])
+def test_anything_but_yes_declines_and_asks_nothing_more(answer: str) -> None:
+    script = run([answer])
 
-    assert script.prompts == [
-        "Enter IATA code or city name (e.g. ARN or Visby): ",
-        "Enter date (YYYY-MM-DD / now / today / tomorrow / yesterday, Enter = today): ",
-        "Filter? (country or city, Enter = none): ",
-        WHICH_PROMPT,
-    ]
-    assert WHICH_PROMPT == "Show 1 arrivals / 2 departures / 3 both: "
+    assert script.prompts == [OFFER_PROMPT]
+    assert script.lines == []
 
 
-def test_shows_a_city_country_count_table_with_a_header() -> None:
-    script, fake = run(["arn", "", "", "1"])
+@pytest.mark.parametrize("answer", ["y", "Y", " yes "])
+def test_yes_asks_for_a_filter_then_shows_the_table(answer: str) -> None:
+    script = run([answer, ""])
 
-    assert fake.calls == [("arrivals", ("ARN", TODAY))]
-    assert any(line.split() == ["City", "Country", "Flights"] for line in script.lines)
+    assert script.prompts == [OFFER_PROMPT, FILTER_PROMPT]
     header = next(i for i, line in enumerate(script.lines) if line.split()[:1] == ["City"])
-    assert [line.split() for line in script.lines[header + 1 : header + 3]] == [
+    assert script.lines[header].split() == ["City", "Country", "Flights"]
+    assert [line.split() for line in script.lines[header + 1 : header + 4]] == [
         ["Oslo", "NORWAY", "2"],
+        ["Atlantis", "Unknown", "1"],
         ["London", "GREAT", "BRITAIN", "1"],
     ]
-
-
-def test_both_merges_and_unmatched_cities_are_listed_after_the_table() -> None:
-    script, fake = run(["arn", "", "", "3"])
-
-    assert [name for name, _ in fake.calls] == ["arrivals", "departures"]
-    assert table(script)[0] == ["Oslo", "NORWAY", "3"]
     assert script.lines[-1] == "Not in the statistics file (country unknown): Atlantis"
 
 
-def test_the_filter_is_passed_through() -> None:
-    script, _ = run(["arn", "", "norway", "3"])
+def test_the_filter_narrows_the_table() -> None:
+    script = run(["y", "norway"])
 
-    assert table(script) == [["Oslo", "NORWAY", "3"]]
+    rows = [
+        line.split() for line in script.lines if line.split()[-1:] and line.split()[-1].isdigit()
+    ]
+    assert rows == [["Oslo", "NORWAY", "2"]]
     assert not any("Atlantis" in line for line in script.lines)
 
 
-@pytest.mark.parametrize("bad", ["4", "0", "both", ""])
-def test_the_1_to_3_choice_re_prompts_on_anything_else(bad: str) -> None:
-    script, fake = run(["arn", "", "", bad, "2"])
+def test_a_filter_that_matches_nothing_says_so_without_a_header() -> None:
+    script = run(["y", "japan"])
 
-    assert "Type 1, 2 or 3." in script.lines
-    assert script.prompts.count(WHICH_PROMPT) == 2
-    assert [name for name, _ in fake.calls] == ["departures"]
+    assert script.lines == ["No destinations found."]
 
 
-def test_nothing_found_says_so() -> None:
-    script, _ = run(["arn", "", "", "1"], FakeFlightSource())
+def test_nothing_is_offered_for_an_empty_list() -> None:
+    script = run([], flights=[])
 
-    assert "No destinations found." in script.lines
-
-
-def test_no_table_header_when_there_is_nothing_to_show() -> None:
-    script, _ = run(["arn", "", "", "1"], FakeFlightSource())
-
-    assert not any(line.split()[:1] == ["City"] for line in script.lines)
+    assert script.prompts == []
+    assert script.lines == []

@@ -112,7 +112,7 @@ swedavia-flightboard/
 │       ├── menu.py            # main loop, dispatch table instead of if/elif chain
 │       ├── prompts.py         # choose_airport() etc.
 │       ├── render.py          # Flight -> formatted text
-│       ├── destinations.py    # destination overview flow (menu option 7)
+│       ├── destinations.py    # destination overview, offered after options 1 and 2
 │       └── demo.py            # full-auto demo
 └── tests/
     ├── fixtures/              # recorded, sanitised real API responses (JSON)
