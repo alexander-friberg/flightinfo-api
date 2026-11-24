@@ -1,0 +1,5 @@
+# Reviewed false positives only. Each line is one finding in one commit, so a real secret
+# added anywhere else, or later, is still caught.
+
+# Made-up API key used by the fixture-recorder tests (not a real Swedavia key).
+3ad740b19118b4d28ec5efbfc238ef18351f1cd4:tests/test_record_fixtures.py:generic-api-key:17

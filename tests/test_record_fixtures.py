@@ -14,7 +14,7 @@ from scripts.record_fixtures import (
     record,
 )
 
-KEY = "test-key-0123456789abcdef"
+KEY = "test-key-0123456789abcdef"  # gitleaks:allow (made-up key for tests)
 TODAY = date(2026, 11, 24)
 
 SK532 = {"flightId": "SK532", "departureTime": {"scheduledUtc": "2026-11-24T16:25:00Z"}}
