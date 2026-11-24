@@ -146,3 +146,37 @@ for Phases 2–4 of `documentation.md` and for the video.
   - The reviewer pointed out that one test computed its expected value with the function under test (`len(raw) - ghosts` using `is_valid_flight`), so a bug would have cancelled itself out. It now asserts the known counts, 289 and 277.
 - **Deviations from plan:** none.
 - **Live API calls used:** 0
+
+## Task 07 – FlightSource protocol and HTTP client (2026-11-24)
+- **Built:**
+  - `api/protocols.py`: the `FlightSource` Protocol (`arrivals`, `departures`, `query`, `health`).
+  - `api/errors.py`: `ApiError` plus `AuthError`, `QuotaExceededError`, `ApiUnavailableError` and `BadQueryError`, each with a user-facing message.
+  - `api/client.py`: `SwedaviaClient(settings, http, clock)`, the only code that talks to Swedavia.
+  - `tests/fakes.py`: `FakeFlightSource` (canned flights, a call log, optional error) for tasks 08–14.
+  - 46 new tests (222 total), all through `httpx.MockTransport` with no network.
+- **Decisions:**
+  - **Three things are injected into the client:**
+    - **The `httpx.Client`:** tests pass one whose transport is a plain function playing Swedavia. The real one is built (and closed) by the composition root in task 14.
+    - **The settings:** key, base URL and timeout.
+    - **A clock:** heartbeat latency is tested with exact numbers and no waiting.
+  - **`health()` reports instead of raising.** A heartbeat must produce a result for every ping, so a timeout becomes `ok=False, status_code=None`, and a 503 becomes `ok=False, status_code=503`. Health is judged by status alone, because the body is `"IsAlive"` and not the documented `{}`. The data methods raise typed errors, which the menu will catch (task 13).
+  - **Each HTTP status maps to one error type:**
+    - 401/403 → `AuthError`, which says to check `SWEDAVIA_API_KEY`.
+    - 429 → `QuotaExceededError`, which names the rate limit or the monthly quota when Swedavia's message says which, and both otherwise.
+    - 5xx, timeouts and connection failures → `ApiUnavailableError`.
+    - 400 on a query → `BadQueryError`, with Swedavia's reason.
+    - Anything else → `ApiError` with the status code.
+    - 204 → an empty list, not an error.
+  - **Keeping the key secret has several layers:**
+    1. The key is sent only in a header, never in the URL.
+    2. Errors are raised `from None`, so no httpx exception (with its request details) is attached.
+    3. Any text from Swedavia's error body is scrubbed of the key before it reaches a message.
+    4. Redirects are never followed.
+    
+    Tests cover each layer, including a fake server that echoes the key back in a 429 and a 400.
+  - The test key is `"fake-key"`: low entropy, so gitleaks won't flag it like the earlier realistic-looking one.
+- **Problems & solutions:**
+  - **A redirect could have leaked the key.** The reviewer pointed out that when httpx follows a redirect to *another* host, it drops the standard `Authorization` header but keeps custom ones, and the subscription key is a custom header (`Ocp-Apim-Subscription-Key`). If the composition root ever enabled `follow_redirects`, the key would go to whatever host the redirect named. Fixed by setting `follow_redirects=False` on every request. The test builds a client *with* redirects enabled and checks that only one request, to Swedavia, is made. I temporarily removed the fix to confirm the test then fails.
+  - The first version only checked key-scrubbing on the 429 path. The reviewer noticed that the 400-on-query path also quotes Swedavia's text, so a key-echoing 400 is now tested as well.
+- **Deviations from plan:** the live contract test now uses the app's `DEFAULT_BASE_URL` (deferred from task 05). The one-off recorder script keeps its own copy.
+- **Live API calls used:** 0

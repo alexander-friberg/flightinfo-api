@@ -11,8 +11,8 @@ from datetime import datetime
 import httpx
 import pytest
 
+from flightboard.config import DEFAULT_BASE_URL as BASE_URL
 from flightboard.domain.airports import STOCKHOLM
-from scripts.record_fixtures import BASE_URL
 
 
 @pytest.mark.live
