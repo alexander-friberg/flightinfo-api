@@ -70,3 +70,29 @@ for Phases 2–4 of `documentation.md` and for the video.
 - **Deviations from plan:** none for the task itself. The CI fix (`.github/workflows/ci.yml`, `tests/test_ci_workflow.py`) was made in the same session but belongs in its own commit.
 - **Live API calls used:** 0
 - **Pending (Alex):** after pushing the CI fix, confirm both `checks` jobs go green.
+
+## Task 04 – Domain model and airports (2026-11-24)
+- **Built:**
+  - `domain/models.py`:
+    - `Direction` (values `A`/`D`, the API's `flightType` codes, so they can go straight into OData filters).
+    - `Scope`: DOMESTIC/INTERNATIONAL/SCHENGEN/UNKNOWN, with `from_indicator()` for the API's `diIndicator`.
+    - Frozen `FlightTimes`, `Flight` and `HealthStatus`. Every `Flight` field except `direction` defaults to "missing", because the API marks every field optional.
+  - `domain/airports.py`:
+    - `AIRPORTS`, read-only, in the original's order and naming.
+    - `resolve_airport()`, which accepts codes, city names and airport names with or without å/ä/ö.
+    - `to_local()`, converting UTC to Europe/Stockholm.
+  - 92 new tests (125 total), mostly parametrized.
+- **Decisions:**
+  - **The domain is pure:** no I/O, no clock, no printing, so it's tested with plain values and needs no fakes at all.
+  - **Naive datetimes are rejected** by `FlightTimes` and `to_local`. Python would silently treat a naive time as the machine's local time, which gives wrong-by-one-hour bugs that only appear on some computers. Aware times are normalised to UTC.
+  - **Accent folding instead of listing every spelling:** names go through Unicode normalisation (NFKD) with the accent marks removed, so `Göteborg`, `göteborg` and `goteborg` are all the same key. Aliases are written in their natural Swedish spelling and folded the same way.
+  - **`Flight.airport_iata`** (not in the task) records which Swedavia airport the flight belongs to. The flight card needs it to show the queried airport's name (the original left it blank), and the airport-less search needs it to say where a result is.
+  - "stockholm" is deliberately not an alias: it could mean Arlanda or Bromma.
+  - **`tzdata` as a runtime dependency** (Alex approved the `uv add`): Windows has no system timezone database, so without it the app wouldn't even start there, e.g. on a grader's machine.
+- **Problems & solutions:**
+  - **A DST test failed although the conversion was right.** For the repeated hour when clocks go back in October, Python (PEP 495) deliberately makes `02:30 CET (second time)` compare *unequal* to the same instant in UTC. The test now compares the actual instants (`timestamp()`), and a comment explains why. Lesson: equality between datetimes in different zones isn't always "same moment".
+  - Reviewer findings: two tests only checked "something came back" (`is not None`), not the right value, so a wrong airport or a dropped time would still have passed. Both now assert exact values.
+  - Reworking the alias table to use natural spellings accidentally dropped the plain `göteborg` alias. The parametrized alias tests caught it immediately.
+- **Deviations from plan:** `Flight.airport_iata` and the `tzdata` dependency, both explained above.
+- **Live API calls used:** 0
+- **CI:** green after the setup-uv fix, run "feat: configuration and secrets". This closes Task 02's pending check.
