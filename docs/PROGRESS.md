@@ -197,3 +197,21 @@ for Phases 2–4 of `documentation.md` and for the video.
   - The reviewer spotted that the store-side copy wasn't tested: the fake always returns fresh lists, so removing that copy broke nothing. A new test uses an inner source that changes its list after returning it. I removed the copy temporarily and confirmed that the test then fails.
 - **Deviations from plan:** none.
 - **Live API calls used:** 0
+
+## Task 09 – Offline flight source (2026-11-24)
+- **Built:**
+  - `api/offline.py`: `OfflineFlightSource`, a `FlightSource` that answers from the recorded ARN day (2026-11-24), with a fixed healthy heartbeat and a small query matcher. It needs no network and no key.
+  - The sample files ship inside the package (`src/flightboard/data/samples/`), loaded through an injectable loader that defaults to `importlib.resources`.
+  - `tests/test_offline.py`: 37 tests (276 total).
+- **Decisions:**
+  - **The same seam the tests use:** offline mode is just another `FlightSource`, so the rest of the app needs no "if offline" branches. Task 14 picks which source to build.
+  - **Honest sample data.** Whatever airport or date you ask for, you get the real recorded ARN day. Flights keep their real airport rather than being relabelled (a "Göteborg" card showing an Arlanda flight would be false). A `label` ("Offline sample data: Stockholm Arlanda, 24 Nov 2026 (recorded), shown for any airport and date") is there for the menu header.
+  - **The sample is shipped inside the package, not read from `tests/`**, so it works after installing. Verified by building the wheel, installing it in a throwaway environment and running it from outside the repo.
+  - **A deliberately small query matcher:** only `and`-joined `eq` clauses on `flightId`, `airport`, `flightType` and `scheduled`. That's exactly what search and the OData presets produce. Anything else gives a clear "not supported offline" `BadQueryError` instead of a wrong answer. Writing a full OData parser for demo data wasn't worth it.
+  - The loader is an injected function, so the tests use a tiny three-flight sample that's easy to reason about, and one test uses the real files.
+- **Problems & solutions:**
+  - **Offline search would have stopped working the day after recording.** The first version filtered queries by `scheduled`, but the lists ignore the date. Search always sends the chosen date (usually today), so from 25 Nov onward offline search would have found nothing, while "show arrivals" still worked. The reviewer caught it. Fixed by applying one rule everywhere: airport and date are *validated* but don't narrow the sample. Lesson: a fake data source has to be consistent with itself, not just with the real API.
+  - **A date parser that was too forgiving.** `strptime("%y%m%d")` happily reads `'2611'` as 1 Jan 2026, so a mistyped date would have quietly matched nothing. The value must now match the exact shape (`\d{6}` or `\d{4}-\d{2}-\d{2}`) before it's parsed.
+  - The parser's case handling was inconsistent (`and` matched any case, `eq` didn't). Keywords and the A/D value are now case-insensitive throughout.
+- **Deviations from plan:** none to the code. A note was added to task 10's file: the "by status" preset isn't supported offline.
+- **Live API calls used:** 0

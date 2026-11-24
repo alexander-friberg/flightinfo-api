@@ -21,3 +21,4 @@ The features behind menu options 1–4, independent of both the terminal and HTT
 Formatting output (task 13).
 
 ## Notes
+- From task 09: offline mode supports the search filter and the departures/arrivals/single-flight presets, but not "by status" (`flightStatus`), which raises `BadQueryError` "not supported offline". That's expected; the menu shows the message.
