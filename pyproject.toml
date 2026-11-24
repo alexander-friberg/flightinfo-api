@@ -1,0 +1,33 @@
+[project]
+name = "flightboard"
+version = "0.1.0"
+description = "Terminal flight board for Sweden's Swedavia airports, using the FlightInfo API v2"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["httpx"]
+
+[dependency-groups]
+dev = ["pytest", "pytest-cov", "ruff", "mypy"]
+
+[build-system]
+requires = ["uv_build>=0.13.9,<0.14"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Markdown is left alone: some docs quote the original app's source verbatim.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: calls the real Swedavia API (excluded by default)"]
+addopts = "-m 'not live'"
