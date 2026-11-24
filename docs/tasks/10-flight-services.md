@@ -18,7 +18,7 @@ The features behind menu options 1–4, independent of both the terminal and HTT
 - [x] Tests with `FakeFlightSource`: sorting, found / not found / multiple matches, search makes exactly one source call with the expected filter string, empty filter makes no source call, error propagation
 
 ## Out of scope
-Formatting output (task 13).
+Formatting output (task 13a).
 
 ## Notes
 - **Alex (2026-11-24): "Deleted" (`DEL`) flights are listed as-is**, with no filtering, and their status text is shown unchanged.

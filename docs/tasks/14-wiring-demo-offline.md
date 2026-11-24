@@ -1,7 +1,7 @@
 # 14 – Composition root, full-auto demo, --offline
 Status: todo
 Owner: agent
-Depends on: 08, 09, 12, 13
+Depends on: 08, 09, 12, 13b
 
 ## Goal
 Wire the real objects together in one place, finish the full-auto demo, and add the `--offline`

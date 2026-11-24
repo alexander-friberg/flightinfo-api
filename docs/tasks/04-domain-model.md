@@ -20,7 +20,7 @@ The pure core of the app: typed flight objects and airport resolution. No I/O.
 - [x] Parametrized tests: all codes, aliases with and without å/ä/ö, whitespace, unknown input → `None`, and a DST-boundary case for `to_local`
 
 ## Out of scope
-Prompting the user (that's CLI, task 13). JSON parsing (task 06).
+Prompting the user (that's CLI, task 13a). JSON parsing (task 06).
 
 ## Notes
 - `Flight.airport_iata` was added: the Swedavia airport a record belongs to (the card fills in its name; airport-less search needs to show where a flight is).

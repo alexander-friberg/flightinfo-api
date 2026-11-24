@@ -205,8 +205,9 @@ The work is split into 15 small tasks in `docs/tasks/`, each one a reviewable co
 | 10 | Flight services: list, search, OData | 07 |
 | 11 | Health check heartbeat | 07 |
 | 12 | Destination statistics | 04, 07 |
-| 13 | CLI: menu, prompts, rendering | 10, 11, 12 |
-| 14 | Composition root, full-auto demo, `--offline` | 08, 09, 12, 13 |
+| 13a | CLI building blocks: console, prompts, flight card, paging | 04 |
+| 13b | CLI menu and option flows | 10, 11, 12, 13a |
+| 14 | Composition root, full-auto demo, `--offline` | 08, 09, 12, 13b |
 | 15 | README, documentation draft, video outline | 14 |
 
 ### CI considerations
