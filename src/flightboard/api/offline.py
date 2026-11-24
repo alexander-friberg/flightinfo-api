@@ -17,11 +17,8 @@ ARRIVALS_FILE = f"arrivals_{SAMPLE_AIRPORT}.json"
 DEPARTURES_FILE = f"departures_{SAMPLE_AIRPORT}.json"
 
 SUPPORTED = (
-    "Offline mode only understands filters like "
-    "flightId eq 'SK532' and airport eq 'ARN' and flightType eq 'A' and scheduled eq '261124' "
-    "(flightId, airport, flightType A/D and scheduled as YYMMDD or YYYY-MM-DD, joined with "
-    "'and'). The sample is one recorded day at ARN, so airport and scheduled are checked but "
-    "don't narrow it down."
+    "Offline mode only supports eq filters on flightId, airport, flightType and scheduled, "
+    "joined with 'and'."
 )
 
 # OData keywords are matched case-insensitively, like the field values below.

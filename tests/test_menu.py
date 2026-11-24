@@ -5,7 +5,8 @@ from datetime import UTC, date, datetime
 import pytest
 
 from flightboard.api.errors import ApiUnavailableError, BadQueryError, QuotaExceededError
-from flightboard.cli.menu import App, run_menu
+from flightboard.cli.app import App
+from flightboard.cli.menu import run_menu
 from flightboard.data.lookup import CityCountryLookup
 from flightboard.domain.models import Direction, Flight, FlightTimes, HealthStatus
 from tests.fakes import FakeFlightSource, ScriptedConsole
@@ -225,11 +226,12 @@ def test_option_5_summary_when_every_ping_fails() -> None:
 # --- options 6 and 7 ------------------------------------------------------------------------
 
 
-def test_option_6_is_a_placeholder_until_the_demo_exists() -> None:
-    script, source, _ = run(["6", "q"])
+def test_option_6_runs_the_full_auto_demo() -> None:
+    script, source, sleeps = run(["6", "q"])
 
-    assert any("demo" in line.lower() for line in script.lines)
-    assert source.call_count == 0
+    assert "=== Demo finished ===" in script.lines
+    assert [name for name, _ in source.calls][:2] == ["arrivals", "departures"]
+    assert sleeps[:4] == [2.5, 2.5, 2.5, 2.5]
 
 
 def test_option_7_shows_the_destination_overview() -> None:

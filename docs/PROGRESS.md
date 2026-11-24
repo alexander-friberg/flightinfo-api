@@ -318,3 +318,40 @@ for Phases 2–4 of `documentation.md` and for the video.
   - The reviewer pointed out that option 7's errors weren't covered by the error test, and that the table header appeared above "No destinations found."; both fixed.
 - **Deviations from plan:** none. Follow-ups for task 14 are in its Notes.
 - **Live API calls used:** 0
+
+## Task 14 – Composition root, full-auto demo, --offline (2026-11-24)
+- **Built:**
+  - `__main__.py`, the composition root. `uv run --env-file .env python -m flightboard` runs against the live API. `uv run python -m flightboard --offline` runs on recorded sample data with no key and no network.
+  - `cli/demo.py`: option 6's full-auto demo.
+  - `cli/app.py`: `App`, moved out of the menu.
+  - `tests/test_demo.py` and `tests/test_main.py` (15 tests, 513 total).
+  
+  **The app is feature-complete.**
+- **Decisions:**
+  - **One place builds everything real:** only `__main__.py` creates the `httpx.Client`, `SwedaviaClient`, cache, offline source, clock, sleep and console (`input`/`print`). Everything else receives them. That's what makes all 513 tests possible without a network. Online, the parts are stacked as menu → `CachingFlightSource` → `SwedaviaClient` → `httpx.Client`, and the client sits in a `with` block so it's closed however the program ends.
+  - **Friendly exits:**
+    - A missing key prints one clear line (copy `.env.example` to `.env`, or use `--offline`) and exits with code 2, with no traceback, before any network object exists.
+    - Ctrl-C or end of input at any prompt says "Goodbye." instead of crashing.
+  - **Offline is honest:** the header says "Offline sample data: Stockholm Arlanda, 24 Nov 2026 (recorded)…", and the heartbeat pings once, since there's no real latency to measure.
+  - **The demo reuses the menu's services**, with no special code path. It runs five headed steps:
+    1. arrivals
+    2. departures
+    3. a search for the first real departure
+    4. the departures OData query
+    5. three heartbeat pings
+    
+    It shows 3 cards per list plus "… and N more", and pauses 2.5 s between steps through the injected sleep, a little over the query endpoint's 2-s limit, because steps 3 and 4 are both queries. A failing step prints its error and the demo continues, so one hiccup doesn't spoil a recording.
+  - **Two test-only parameters:** `main(argv, transport=None, sleep=time.sleep)`. A test can run the *online* path against a fake Swedavia (`httpx.MockTransport`) with no waiting.
+- **Problems & solutions:**
+  - **A circular import:** option 6 must call the demo, and the demo needs `App` and the ping text, which lived in `menu.py`. `App` moved to `cli/app.py`, and the ping and summary text became pure functions in `cli/render.py`, next to the flight card.
+  - **An acceptance criterion with no test:** the reviewer pointed out that nothing proved the HTTP client is closed: deleting the `with` block would still pass every test. The `transport` parameter fixed that. A fake transport records being closed, and two tests check it, after a normal quit and after Ctrl-C. I removed the `with` temporarily to confirm the test then fails.
+  - **The 13b follow-ups:**
+    - The offline "not supported" message went from about 400 characters to one sentence.
+    - The live-API hint kept its operator list (the reviewer's point: that's what a user needs after a rejected filter).
+    - Offline heartbeats went from five "0 ms" lines to one.
+  - Task 01's smoke test expected the old placeholder output; it now runs `python -m flightboard --help` and checks for `--offline`.
+- **Manual checks:**
+  - `printf '6\nq\n' | uv run python -m flightboard --offline` ran the whole demo with no network (search found SK1415, the OData filter was printed).
+  - Running online without a key printed the message and exited with 2.
+- **Deviations from plan:** the test-only `transport`/`sleep` parameters on `main`, and `App` moving to its own module.
+- **Live API calls used:** 0. The online path is covered with a fake transport; a real live run is the natural next manual check.

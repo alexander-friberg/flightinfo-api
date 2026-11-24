@@ -4,7 +4,8 @@ import re
 from datetime import datetime
 
 from flightboard.domain.airports import AIRPORTS, to_local
-from flightboard.domain.models import Direction, Flight, Scope
+from flightboard.domain.models import Direction, Flight, HealthStatus, Scope
+from flightboard.services.health import HeartbeatReport
 
 MISSING = "N/A"
 NO_TIME = "–"
@@ -55,3 +56,24 @@ def _time(moment: datetime | None) -> str:
         return NO_TIME
     local = to_local(moment)
     return f"{moment:%H:%M} UTC → {local:%H:%M} {local.tzname()}"
+
+
+def render_ping(number: int, status: HealthStatus) -> str:
+    """One heartbeat line. Failures never show a time: a missing response has none (0.0), and a
+    time next to an error message would read as if the API were up."""
+    if not status.ok:
+        return f"Ping {number}: FAILED – {status.message or 'no response'}"
+    note = f" – {status.message}" if status.message else ""
+    return f"Ping {number}: OK, {status.latency_ms:.0f} ms (HTTP {status.status_code}){note}"
+
+
+def render_heartbeat_summary(report: HeartbeatReport) -> str:
+    count = len(report.results)
+    noun = "ping" if count == 1 else "pings"
+    head = f"{count} {noun}: {report.successes} OK, {report.failures} failed."
+    if report.min_ms is None or report.avg_ms is None or report.max_ms is None:
+        return f"{head} No successful pings."
+    return (
+        f"{head} Latency min/avg/max: "
+        f"{report.min_ms:.0f}/{report.avg_ms:.0f}/{report.max_ms:.0f} ms"
+    )

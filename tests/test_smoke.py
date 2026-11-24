@@ -20,11 +20,11 @@ def test_package_layers_import(module: str) -> None:
     importlib.import_module(module)
 
 
-def test_running_the_package_prints_placeholder() -> None:
+def test_the_package_runs_as_a_program() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "flightboard"],
+        [sys.executable, "-m", "flightboard", "--help"],
         capture_output=True,
         text=True,
         check=True,
     )
-    assert "Swedavia Flight Board" in result.stdout
+    assert "--offline" in result.stdout

@@ -275,6 +275,8 @@ def test_status_preset_offline_gives_a_message_that_does_not_contradict_itself()
         FlightService(OfflineFlightSource()).run_query(cancelled.build())
 
     message = str(raised.value)
-    assert message.startswith("Offline mode only understands")
-    hint = message.split("don't narrow it down.", 1)[1]
-    assert "live connection" in hint
+    offline_part, live_part = message.split(" Live API: ", 1)
+    assert offline_part.startswith("Offline mode only supports")
+    assert "flightStatus" not in offline_part
+    assert "flightStatus" in live_part
+    assert len(message) <= 280

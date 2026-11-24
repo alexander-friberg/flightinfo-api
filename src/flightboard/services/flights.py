@@ -11,9 +11,8 @@ from flightboard.domain.models import Flight
 
 # Worded for the live API, so it stays true after an offline source's own explanation.
 QUERY_HINT = (
-    "With a live connection, Swedavia accepts the fields airport, flightType (A or D), "
-    "scheduled (YYMMDD), estimated, flightStatus and flightId, with eq, ne, gt, ge, lt, le, "
-    "and, or. Example: airport eq 'ARN' and flightType eq 'D'"
+    "Live API: airport, flightType (A/D), scheduled (YYMMDD), estimated, flightStatus, flightId; "
+    "eq ne gt ge lt le, and, or. E.g. airport eq 'ARN' and flightType eq 'D'"
 )
 _LAST = datetime.max.replace(tzinfo=UTC)
 

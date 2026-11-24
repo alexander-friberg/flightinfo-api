@@ -1,42 +1,21 @@
 """The main menu: the original's six options plus the destination overview."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
-from datetime import date
 
 from flightboard.api.errors import ApiError
-from flightboard.api.protocols import FlightSource
+from flightboard.cli.app import App
+from flightboard.cli.demo import run_demo
 from flightboard.cli.destinations import run_destination_overview
-from flightboard.cli.io import Console
 from flightboard.cli.pager import page
 from flightboard.cli.prompts import choose_airport, choose_date
-from flightboard.cli.render import render_flight
-from flightboard.data.lookup import CityCountryLookup
-from flightboard.domain.models import Flight, HealthStatus
-from flightboard.services.flights import FlightService, odata_presets
-from flightboard.services.health import HeartbeatReport, heartbeat
+from flightboard.cli.render import render_flight, render_heartbeat_summary, render_ping
+from flightboard.domain.models import Flight
+from flightboard.services.flights import odata_presets
+from flightboard.services.health import heartbeat
 
-TITLE = "Swedavia FlightInfo API v2 – Python client"
 CHOICE_PROMPT = "Choose an option: "
 FLIGHT_PROMPT = "Enter flight number (e.g. SK1415): "
 FILTER_PROMPT = "Enter OData filter: "
-
-
-@dataclass(frozen=True)
-class App:
-    """Everything the menu needs, passed in. Task 14 builds the real one; tests build fakes."""
-
-    console: Console
-    source: FlightSource
-    lookup: CityCountryLookup
-    today: Callable[[], date]
-    sleep: Callable[[float], None]
-    title: str = TITLE
-
-    @property
-    def flights(self) -> FlightService:
-        return FlightService(self.source)
-
 
 Handler = Callable[[App], None]
 
@@ -106,35 +85,13 @@ def _odata(app: App) -> None:
 
 
 def _health(app: App) -> None:
-    report = heartbeat(app.source, sleep=app.sleep, on_result=lambda n, s: _ping(app, n, s))
-    app.console.write(_summary(report))
-
-
-def _ping(app: App, number: int, status: HealthStatus) -> None:
-    if status.ok:
-        note = f" – {status.message}" if status.message else ""
-        app.console.write(
-            f"Ping {number}: OK, {status.latency_ms:.0f} ms (HTTP {status.status_code}){note}"
-        )
-    else:
-        # Failures never show a time: a missing response has none (latency 0.0), and a time
-        # next to an error message would read as if the API were up.
-        app.console.write(f"Ping {number}: FAILED – {status.message or 'no response'}")
-
-
-def _summary(report: HeartbeatReport) -> str:
-    head = f"{len(report.results)} pings: {report.successes} OK, {report.failures} failed."
-    if report.min_ms is None or report.avg_ms is None or report.max_ms is None:
-        return f"{head} No successful pings."
-    return (
-        f"{head} Latency min/avg/max: "
-        f"{report.min_ms:.0f}/{report.avg_ms:.0f}/{report.max_ms:.0f} ms"
+    report = heartbeat(
+        app.source,
+        count=app.ping_count,
+        sleep=app.sleep,
+        on_result=lambda n, s: app.console.write(render_ping(n, s)),
     )
-
-
-def _demo(app: App) -> None:
-    # shortcut: placeholder message, replaced by the full-auto demo in task 14.
-    app.console.write("The full-auto demo isn't available yet.")
+    app.console.write(render_heartbeat_summary(report))
 
 
 def _destinations(app: App) -> None:
@@ -147,6 +104,6 @@ OPTIONS: dict[str, tuple[str, Handler]] = {
     "3": ("Search a specific flight number", _search),
     "4": ("OData query (query endpoint)", _odata),
     "5": ("HeartBeat – API health check", _health),
-    "6": ("Demonstrate all endpoints automatically", _demo),
+    "6": ("Demonstrate all endpoints automatically", run_demo),
     "7": ("Destination overview", _destinations),
 }
