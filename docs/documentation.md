@@ -367,37 +367,109 @@ The API key is read from an environment variable that `uv run --env-file .env` l
 
 ---
 
-## Phase 3: Completion & improvement *(fill in)*
+## Phase 3: Completion & improvement
 
 ### Finishing the project
+The last part of the work joined the pieces into a program:
+- **The terminal UI:** I split it into two tasks so each commit stayed small enough to review properly.
+  - Task 13a built the building blocks: a console with injected input and output, the airport and date prompts, the flight card and paging.
+  - Task 13b built the menu and the option flows on top of them.
+- **The composition root (task 14):** `__main__.py` is the one file that creates the real objects (the HTTP client, the Swedavia client, the cache, the offline source, the clock and the console) and passes them in. The same task added the full-auto demo and the `--offline` flag. After it, `python -m flightboard` started the real application.
+- **One correction after that:** the recreation had a seventh menu option, "Destination overview", that the original doesn't have. I moved the overview into options 1 and 2 and removed the extra option, as its own commit, so the menu matches the original's six options.
+
+At that point every feature of the original existed, and the recreation also had:
+- offline mode
+- clear error handling
+- the tests and the CI pipeline
+
 ### Testing the whole solution
-*(Test count, coverage, manual end-to-end run against the live API.)*
+**Automated tests:**
+- **Size and speed:** 521 tests in 25 test files run in about two seconds and never touch the network. The only line they don't execute is the `if __name__ == "__main__":` line that starts the program, which a test runs in a separate process where coverage can't see it. That gives 99 % line coverage (843 statements).
+- **The test double each layer uses:**
+
+  | Layer | Test double |
+  |---|---|
+  | Domain (flight model, airports, time zones) | plain values, no fakes needed |
+  | Parser | the real API responses recorded in task 05 |
+  | HTTP client | a fake Swedavia built on `httpx.MockTransport` that plays any status code, timeout or malformed body |
+  | Services, cache, heartbeat | a hand-written `FakeFlightSource` and a recording `sleep`, so nothing really waits |
+  | Menu and prompts | a scripted console that answers from a list and records every line printed, so a whole session is tested as text |
+- **A live contract test** checks that the real API still answers in the shape the parser expects. It's excluded by default because it costs quota, and is run on purpose with `pytest -m live`.
+
+**CI:** every push runs the same checks as my local hooks (ruff, formatting, strict mypy, the test suite) on Python 3.12 and 3.13, plus a gitleaks scan of the whole git history. CI has been green on every push since the two CI fixes described in Phase 2.
+
+**Testing the tests:** for the most important guarantees, I removed the code that provides the guarantee and confirmed the test then fails:
+- the HTTP client being closed when the program ends
+- redirects never being followed (so the API key can't leak to another host)
+- the cache keeping its own copy of each answer
+
+A test that still passes without the code it protects proves nothing.
+
+**Manual end-to-end runs:**
+- **Offline:** I ran `uv run python -m flightboard --offline` and the full-auto demo (option 6) worked end to end with no network.
+- **Missing key:** starting online without an API key printed one clear line and exited with code 2.
+- **Live:** I ran the application against the live Swedavia API, going through the menu and the full-auto demo, and it worked.
+
 ### Improvements and optimisation
-*(e.g. caching, clearer error messages, rendering.)*
+**Using less of the API quota:**
+- **A response cache:** recent answers are reused for 120 seconds, so viewing the same list again costs nothing. The cache is a wrapper around any flight source, not part of the client, so it can be switched off or reused without touching the client.
+- **Search uses one query, not two:** `flightId eq 'SK1415' and scheduled eq '261124'` finds the flight in both directions at every airport.
+- **The destination overview is free:** it's counted from the flights already listed.
+- **A cheap heartbeat:** five pings, 2 s apart, with the cost written next to the setting in the code.
+
+**Clearer errors:**
+- **One error type per failure:** each kind of failure has its own error type with a message a user can act on:
+
+  | Failure | What the message says |
+  |---|---|
+  | Bad key | check `SWEDAVIA_API_KEY` |
+  | Too many requests | whether it's the 2-second rate limit or the monthly quota |
+  | Swedavia unreachable | the server is down or not answering |
+  | Rejected filter | Swedavia's reason, plus a hint |
+- **One place catches them all:** the menu shows any of them as one line and keeps running.
+- **A shorter offline message:** offline mode's "not supported" message went from about 400 characters to one sentence.
+- **Clean exits:** a missing key gives a clear message and exit code 2; Ctrl-C or end of input at any prompt says "Goodbye." instead of showing a traceback.
+
+**Rendering:**
+- **The original's card:** the flight card copies the original's layout and spacing from the video, with two improvements:
+  - both airports are shown as `Name (IATA)`, so the name the original left blank is filled in;
+  - times are shown in both UTC and Swedish local time, with the correct zone name in winter and summer (CET/CEST).
+- **Paging:** it only asks for input when there's more to show.
+- **Honest heartbeat output:** a failed ping never shows a misleading "0 ms", and offline mode pings once, since there's no real network time to measure.
+
+**Offline mode:** `--offline` runs the whole application on one recorded day at Arlanda, with no key and no network. That's useful for demos, for the video, and when the monthly quota is used up. The header says clearly that it's sample data.
+
 ### Publishing
-*(GitHub repository, README, CI badge.)*
+The project is public on GitHub: https://github.com/alexander-friberg/flightinfo-api. What's in place:
+- **README:** explains what the app is and how to install, configure and run it (online and offline). It also covers how to run the tests, including the live contract test.
+- **CI badge:** shows the state of the latest run.
+- **Secrets:** the repository contains `.env.example` but never a real `.env`. The gitleaks scan in CI checks the whole history on every push. The only finding ever reported was a made-up test key, which is ignored by its exact fingerprint, so any real secret would still be caught.
+- **Documentation:** `research.md`, `api-reference.md`, this document and the work log `PROGRESS.md` are in `docs/`, so the reasoning behind every decision is published with the code.
 
 ### Problems and solutions
-- **Problem:** *(e.g. worked locally but failed in CI: missing dependency, Python version, path to `city_country.json`)*
-  **Solution:**
-- **Problem:** *(small bugs at the end)*
-  **Solution:**
+- **Problem:** A circular import. The menu's option 6 calls the demo, but the demo needed the `App` object and the heartbeat text, which were defined in the menu.
+  **Solution:** `App` moved to its own module, and the heartbeat text became plain functions next to the flight card. Both the menu and the demo now import them, and neither imports the other's internals.
+- **Problem:** An acceptance criterion with no test behind it. "The HTTP client is closed on exit" was true, but deleting the code that closes it would still have passed every test.
+  **Solution:** `main()` got an optional `transport` parameter, used only by tests. A test runs the online path against a fake Swedavia that records whether it was closed, both after quitting normally and after Ctrl-C.
+- **Problem:** Typing `²` at the OData menu's "Choose 1-5" would have crashed the program. Python's `"²".isdigit()` is True, but `int("²")` raises an error that the menu doesn't catch.
+  **Solution:** The answer is now compared with the allowed values `"1"`–`"5"`, and a test types `²`.
+- **Problem:** The test console didn't behave like a real terminal. A flight card is one multi-line string, so the fake recorded it as one "line", and tests couldn't find the card's first line.
+  **Solution:** The fake now splits output into lines the way `print` shows them. When a fake behaves differently from the real thing, the fake is what needs fixing.
+- **Problem:** Offline mode looked clumsy. An unsupported query showed a message of about 400 characters, and the heartbeat printed five pings of "0 ms".
+  **Solution:** The offline message is now one sentence, and the help text after it is worded for the live API so the two never contradict each other. Offline mode pings once.
 
 ---
 
-## Phase 4: Problems & solutions (summary) *(fill in)*
-- **Problem:** Inconsistent data from the API (ghost entries, missing fields)
-  **Solution:**
-- **Problem:** No access to the original source code
-  **Solution:**
-- **Problem:** Limited API quota
-  **Solution:**
-- **Problem:** *(…)*
-  **Solution:**
+## Phase 4: Problems & solutions (summary)
+- **Problem:** Swedavias API portal being inconsistent.
+  **Solution:** Since access to the portal was spotty, it became more a matter of luck than consistent access to the site. 
+- **Problem:** Minor issues and slight miscommunication with the agent.
+  **Solution:** The scope is generally too big and implementation is larger than what i originally planned, which is my fault for not properly explaining this.
 
 ---
 
-## Conclusion *(fill in)*
-### What I achieved
-### What I learned
-### What could be improved
+## Conclusion
+All of this resulted in a robust app that delivers constructed flight data to the user and gave me an opportunity to get familiar with an agentic workflow.
+It also resulted in a more secure application since risks like the API key being in plaintext were dealt with, i.e putting the API key in a .env file.
+I learned how CI is implemented (although in a smaller scale) and how TDD (Test Driven Development) works.
+Some improvements i see is the sheer amount of code for something that doesnt really need to be this big. I was wanting a bit more SRP / proper file structure and some general tests but the actual implementation resulted in a much higher volume of test code tham actual production code.
